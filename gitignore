@@ -1,0 +1,31 @@
+# Ambiente virtual — nunca vai ao GitHub
+venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Variáveis de ambiente e chaves de API
+.env
+*.key
+*.secret
+
+# Arquivos de notas fiscais (privacidade)
+step1_ocr/samples/*.pdf
+step1_ocr/samples/*.jpg
+step1_ocr/samples/*.jpeg
+step1_ocr/samples/*.png
+step1_ocr/samples/*.tiff
+
+# Planilhas geradas
+*.xlsx
+*.csv
+
+# VS Code
+.vscode/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
