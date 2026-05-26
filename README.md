@@ -37,6 +37,6 @@ python step1_ocr/extractor.py step1_ocr/samples/sua_nota.pdf
 ## Stack
 
 - **OCR:** `pdfplumber`, `pytesseract`, `opencv-python`, `pdf2image`
-- **LLM:** Claude API (Anthropic)
+- **LLM:** (em breve)
 - **Planilha:** `openpyxl` / Google Sheets API
 - **Interface:** Streamlit
