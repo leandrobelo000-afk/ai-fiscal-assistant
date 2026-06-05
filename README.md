@@ -2,7 +2,7 @@
 
 > Assistente financeiro com IA que realiza a leitura automática de notas fiscais e organiza todas as informações em planilhas. 
 
-O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a anterior, com o objetivo de demonstrar a aplicação prática de técnicas avançadas de Engenharia de IA e Automação de Dados em um problema corporativo real.
+O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a anterior, com o objetivo de demonstrar a aplicação prática de técnicas de Engenharia de IA e Automação de Dados em um problema corporativo real.
 
 ## 🚀 Etapas do Projeto
 
