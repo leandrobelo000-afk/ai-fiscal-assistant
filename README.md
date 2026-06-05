@@ -1,42 +1,31 @@
-# AI Fiscal Assistant
+# 🧾 AI Fiscal Assistant
 
-Assistente financeiro com IA que realiza leitura automática de notas fiscais
-e organiza todas as informações em planilha.
+> Assistente financeiro com IA que realiza a leitura automática de notas fiscais e organiza todas as informações em planilhas. 
 
-Projeto desenvolvido em etapas para portfólio de engenharia de IA.
+O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a anterior, com o objetivo de demonstrar a aplicação prática de técnicas avançadas de Engenharia de IA e Automação de Dados em um problema corporativo real.
 
-## Etapas
+## 🚀 Etapas do Projeto
 
-| # | Pasta | Status | Descrição |
-|---|---|---|---|
-| 1 | `step1_ocr/` | ✅ concluída | Extração de dados com OCR |
-| 2 | `step2_llm/` | 🔜 em breve | Processamento e classificação com LLM |
-| 3 | `step3_spreadsheet/` | 🔜 em breve | Gravação automática em planilha |
-| 4 | `step4_interface/` | 🔜 em breve | Interface de upload e chat |
-| 5 | `step5_dashboard/` | 🔜 em breve | Dashboard financeiro |
+| # | Etapa | Status | Descrição |
+|---|---|:---:|---|
+| 1 | `step1_ocr/` | ✅ Concluída | Extração de dados via OCR |
+| 2 | `step2_llm/` | ✅ Concluída | Processamento Vision + Tesseract com LLM local |
+| 3 | `step3_spreadsheet/` | 🔜 Em breve | Gravação automática em planilha |
+| 4 | `step4_interface/` | 🔜 Em breve | Interface de upload e chat |
+| 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro e analytics |
 
-## Como rodar
+---
 
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/ai-fiscal-assistant.git
-cd ai-fiscal-assistant
+## 🏗️ Arquitetura Atual (Etapas 1 e 2)
 
-# 2. Crie e ative o ambiente virtual
-python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Mac/Linux
+O pipeline de processamento foi desenhado para maximizar a precisão. O modelo de visão atua como processador principal, enquanto o OCR clássico funciona como um *fallback* (plano B) seguro para quando o LLM demonstra baixa confiança na leitura.
 
-# 3. Instale as dependências
-pip install -r requirements.txt
-
-# 4. Rode a extração (Etapa 1)
-python step1_ocr/extractor.py step1_ocr/samples/sua_nota.pdf
-```
-
-## Stack
-
-- **OCR:** `pdfplumber`, `pytesseract`, `opencv-python`, `pdf2image`
-- **LLM:** (em breve)
-- **Planilha:** `openpyxl` / Google Sheets API
-- **Interface:** Streamlit
+```mermaid
+flowchart TD
+    A[📄 Imagem / PDF da Nota Fiscal] --> B(🧠 Qwen2.5-VL Vision<br/>rodando local via LM Studio)
+    B -- Lê a imagem diretamente --> C{Confiança da leitura é baixa?}
+    C -- Não --> D[JSON Estruturado]
+    C -- Sim --> E[🔍 Tesseract OCR <br/>Fallback Automático]
+    E -- Extrai o texto bruto --> F(🤖 LLM processa o texto bruto)
+    F --> D
+    D --> G[\Objeto: NotaFiscalProcessada<br/>numero, data, cnpj, valor, impostos, itens...\]
