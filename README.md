@@ -31,7 +31,7 @@ flowchart TD
     D --> G[\Objeto: NotaFiscalProcessada<br/>numero, data, cnpj, valor, impostos, itens...\]
 ```
 
-#🛠️ Stack
+# 🛠️ Stack
 
 Camada         |   TecnologiaUtilizada                                  
 OCR (Fallback) |   pdfplumber, pytesseract, opencv-python, pdf2image    
@@ -41,7 +41,7 @@ Planilha       |   openpyxl / Google Sheets API (em breve)
 InterfaceS     |   treamlit (em breve)
 Linguagem      |   Python 3.11+
 
-#⚙️ Como Rodar Localmente
+# ⚙️ Como Rodar Localmente
 
 Pré-requisitos: Python 3.11+, Git, e LM Studio com o modelo Qwen2.5-VL-3B-Instruct instalado.
 
@@ -65,7 +65,7 @@ python step2_llm/processor.py
 
 💡 Dica: Ao rodar o processor.py, uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
 
-#🔍 Detalhamento das Etapas
+# 🔍 Detalhamento das Etapas
 
 📋 Etapa 1 — Extração OCR
 Detecta automaticamente se o arquivo de entrada é um PDF nativo ou uma imagem escaneada, aplicando o pré-processamento adequado (escala de cinza, binarização, remoção de ruído) antes de executar o OCR. O sistema retorna um objeto com um confidence_score calculado para cada campo.
