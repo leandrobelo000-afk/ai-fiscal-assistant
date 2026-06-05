@@ -29,6 +29,7 @@ flowchart TD
     E -- Extrai o texto bruto --> F(🤖 LLM processa o texto bruto)
     F --> D
     D --> G[\Objeto: NotaFiscalProcessada<br/>numero, data, cnpj, valor, impostos, itens...\]
+```
 
 ##🛠️ Stack
 
