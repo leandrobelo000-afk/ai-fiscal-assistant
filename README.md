@@ -31,15 +31,17 @@ flowchart TD
     D --> G[\Objeto: NotaFiscalProcessada<br/>numero, data, cnpj, valor, impostos, itens...\]
 ```
 
-# 🛠️ Stack
+## 🛠️ Stack Tecnológico
 
-Camada         |   TecnologiaUtilizada                                  
-OCR (Fallback) |   pdfplumber, pytesseract, opencv-python, pdf2image    
-Vision + LLM   |   Qwen2.5-VL-3B-Instruct (via LM Studio)               
-Comunicação    |   requests (API compatível OpenAI)
-Planilha       |   openpyxl / Google Sheets API (em breve)
-InterfaceS     |   treamlit (em breve)
-Linguagem      |   Python 3.11+
+| Camada | Tecnologia Utilizada |
+|---|---|
+| **OCR (Fallback)** | `pdfplumber`, `pytesseract`, `opencv-python`, `pdf2image` |
+| **Vision + LLM** | Qwen2.5-VL-3B-Instruct (via LM Studio) |
+| **Comunicação** | `requests` (API compatível OpenAI) |
+| **Planilha** | `openpyxl` / Google Sheets API *(em breve)* |
+| **Interface** | Streamlit *(em breve)* |
+| **Linguagem** | Python 3.11+ |
+
 
 # ⚙️ Como Rodar Localmente
 
