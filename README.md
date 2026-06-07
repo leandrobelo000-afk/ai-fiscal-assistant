@@ -10,7 +10,7 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 |---|---|:---:|---|
 | 1 | `step1_ocr/` | ✅ Concluída | Extração de dados via OCR |
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision + Tesseract com LLM local |
-| 3 | `step3_spreadsheet/` | 🔜 Em breve | Gravação automática em planilha |
+| 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação automática em planilha |
 | 4 | `step4_interface/` | 🔜 Em breve | Interface de upload e chat |
 | 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro e analytics |
 
@@ -38,7 +38,7 @@ flowchart TD
 | **OCR (Fallback)** | `pdfplumber`, `pytesseract`, `opencv-python`, `pdf2image` |
 | **Vision + LLM** | Qwen2.5-VL-3B-Instruct (via LM Studio) |
 | **Comunicação** | `requests` (API compatível OpenAI) |
-| **Planilha** | `openpyxl` / Google Sheets API *(em breve)* |
+| **Planilha** | `pandas`, `openpyxl` |
 | **Interface** | Streamlit *(em breve)* |
 | **Linguagem** | Python 3.11+ |
 
@@ -62,10 +62,10 @@ pip install -r requirements.txt
 4. Inicie o servidor local do LM Studio
 lms server start
 
-5. Rode o processamento completo (Etapas 1 + 2)
-python step2_llm/processor.py
+5. Rode o processamento completo (Etapa 3)
+python step3_spreadsheet/writer.py
 
-💡 Dica: Ao rodar o processor.py, uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
+💡 Dica: Ao rodar o writer.py, pedirá para abrir ou salvar o arquivo xlsx (planilha), após isto uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
 
 # 🔍 Detalhamento das Etapas
 
@@ -74,3 +74,15 @@ Detecta automaticamente se o arquivo de entrada é um PDF nativo ou uma imagem e
 
 🤖 Etapa 2 — Processamento com LLM Local
 Utiliza o modelo local Qwen2.5-VL-3B-Instruct, aproveitando sua capacidade Vision para interpretar a imagem da nota fiscal de forma orgânica, dispensando o OCR na maioria dos casos. O Tesseract atua de forma complementar e tolerante a falhas (fallback), sendo acionado automaticamente apenas quando a confiança do modelo é baixa.
+
+📊 Etapa 3 — Gravação em planilha Excel
+Grava os dados estruturados em notas_fiscais.xlsx de forma acumulativa — cada nova nota processada adiciona uma linha sem sobrescrever as anteriores.
+Funcionalidades:
+
+Seletor visual para escolher onde salvar a planilha
+Processamento de múltiplas notas de uma vez
+Anti-duplicata por número de NF
+Aba Resumo com totais automáticos
+Aba Itens com todos os produtos detalhados
+Instalação automática das dependências
+
