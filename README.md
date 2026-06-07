@@ -48,27 +48,32 @@ flowchart TD
 | **Linguagem** | Python 3.11+ |
 
 
-# ⚙️ Como Rodar Localmente
+## ⚙️ Como Rodar Localmente
 
-Pré-requisitos: Python 3.11+, Git, e LM Studio com o modelo Qwen2.5-VL-3B-Instruct instalado.
+**Pré-requisitos:** Python 3.11+, Git, e LM Studio com o modelo `Qwen2.5-VL-3B-Instruct` instalado.
 
-1. Clone o repositório
+### Passo 1: Preparar o projeto
+Primeiro, baixe o repositório para a sua máquina e entre na pasta raiz do projeto:
+```
 git clone [https://github.com/leandrobelo000-afk/ai-fiscal-assistant.git](https://github.com/leandrobelo000-afk/ai-fiscal-assistant.git)
 cd ai-fiscal-assistant
-
-2. Crie e ative o ambiente virtual
+```
+###Passo 2: Criar o ambiente virtual
+Para evitar conflitos de versão com outras ferramentas do seu computador, crie e ative um ambiente virtual isolado:
+```
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Mac/Linux
 
-3. Instale as dependências
+# Ative o ambiente (Se estiver no Windows):
+venv\Scripts\activate
+
+# Ative o ambiente (Se estiver no Mac/Linux):
+source venv/bin/activate
+```
+###Passo 3: Instalar as dependências
+Com o ambiente ativado (você verá um (venv) no início da linha do terminal), instale o Pandas, Openpyxl e as ferramentas de visão computacional:
+```
 pip install -r requirements.txt
-
-4. Inicie o servidor local do LM Studio
-lms server start
-
-5. Rode o processamento completo (Etapa 3)
-python step3_spreadsheet/writer.py
+```
 
 💡 Dica: Ao rodar o writer.py, pedirá para abrir ou salvar o arquivo xlsx (planilha), após isto uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
 
