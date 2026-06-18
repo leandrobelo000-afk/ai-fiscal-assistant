@@ -1,8 +1,8 @@
 # 🧾 AI Fiscal Assistant
 
-> Assistente financeiro com IA que realiza a leitura automática de notas fiscais e organiza todas as informações em planilhas. 
+> Assistente financeiro com IA que realiza a leitura automática de notas fiscais e organiza todas as informações em planilhas Excel avançadas. 
 
-O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a anterior, com o objetivo de demonstrar a aplicação prática de técnicas de Engenharia de IA e Automação de Dados em um problema corporativo real.
+O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a anterior, com o objetivo de demonstrar a aplicação prática de técnicas avançadas de Engenharia de IA e Automação de Dados em um problema corporativo real.
 
 ## 🚀 Etapas do Projeto
 
@@ -10,25 +10,30 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 |---|---|:---:|---|
 | 1 | `step1_ocr/` | ✅ Concluída | Extração de dados via OCR |
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision + Tesseract com LLM local |
-| 3 | `step3_spreadsheet/` | 🔜 Em breve | Gravação automática em planilha |
+| 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação acumulativa e inteligente em planilha Excel |
 | 4 | `step4_interface/` | 🔜 Em breve | Interface de upload e chat |
 | 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro e analytics |
 
 ---
 
-## 🏗️ Arquitetura Atual (Etapas 1 e 2)
+## 🏗️ Arquitetura Atual (Pipeline de Processamento)
 
-O pipeline de processamento foi desenhado para maximizar a precisão. O modelo de visão atua como processador principal, enquanto o OCR clássico funciona como um *fallback* (plano B) seguro para quando o LLM demonstra baixa confiança na leitura.
+O pipeline foi desenhado para processar múltiplos arquivos em lote, garantindo a integridade dos dados através de travas anti-duplicidade e estruturando a saída em um modelo relacional dentro do Excel (Abas separadas para Resumo e Itens).
 
 ```mermaid
 flowchart TD
-    A[📄 Imagem / PDF da Nota Fiscal] --> B(🧠 Qwen2.5-VL Vision<br/>rodando local via LM Studio)
+    A[📄 Uma ou Múltiplas NFs<br/>Imagens / PDFs] --> B(🧠 Qwen2.5-VL Vision<br/>rodando local via LM Studio)
     B -- Lê a imagem diretamente --> C{Confiança da leitura é baixa?}
     C -- Não --> D[JSON Estruturado]
     C -- Sim --> E[🔍 Tesseract OCR <br/>Fallback Automático]
     E -- Extrai o texto bruto --> F(🤖 LLM processa o texto bruto)
     F --> D
-    D --> G[\Objeto: NotaFiscalProcessada<br/>numero, data, cnpj, valor, impostos, itens...\]
+    D --> G[🔍 Validação do Número da NF]
+    G --> H{A nota já existe<br/>na planilha?}
+    H -- Sim --> I[❌ Ignorar Registro<br/>Alerta de Duplicidade]
+    H -- Não --> J[📊 Pandas + openpyxl<br/>Alimentação Acumulativa]
+    J --> K[📋 Aba: Resumo<br/>Dados Gerais e Totais]
+    J --> L[🛒 Aba: Itens<br/>Produtos Detalhados]
 ```
 
 ## 🛠️ Stack Tecnológico
@@ -38,34 +43,39 @@ flowchart TD
 | **OCR (Fallback)** | `pdfplumber`, `pytesseract`, `opencv-python`, `pdf2image` |
 | **Vision + LLM** | Qwen2.5-VL-3B-Instruct (via LM Studio) |
 | **Comunicação** | `requests` (API compatível OpenAI) |
-| **Planilha** | `openpyxl` / Google Sheets API *(em breve)* |
+| **Planilha** | `pandas`, `openpyxl` |
 | **Interface** | Streamlit *(em breve)* |
 | **Linguagem** | Python 3.11+ |
 
 
-# ⚙️ Como Rodar Localmente
+## ⚙️ Como Rodar Localmente
 
-Pré-requisitos: Python 3.11+, Git, e LM Studio com o modelo Qwen2.5-VL-3B-Instruct instalado.
+**Pré-requisitos:** Python 3.11+, Git, e LM Studio com o modelo `Qwen2.5-VL-3B-Instruct` instalado.
 
-1. Clone o repositório
+### Passo 1: Preparar o projeto
+Primeiro, baixe o repositório para a sua máquina e entre na pasta raiz do projeto:
+```
 git clone [https://github.com/leandrobelo000-afk/ai-fiscal-assistant.git](https://github.com/leandrobelo000-afk/ai-fiscal-assistant.git)
 cd ai-fiscal-assistant
-
-2. Crie e ative o ambiente virtual
+```
+###Passo 2: Criar o ambiente virtual
+Para evitar conflitos de versão com outras ferramentas do seu computador, crie e ative um ambiente virtual isolado:
+```
 python -m venv venv
-venv\Scripts\activate      # Windows
-source venv/bin/activate   # Mac/Linux
 
-3. Instale as dependências
+# Ative o ambiente (Se estiver no Windows):
+venv\Scripts\activate
+
+# Ative o ambiente (Se estiver no Mac/Linux):
+source venv/bin/activate
+```
+###Passo 3: Instalar as dependências
+Com o ambiente ativado (você verá um (venv) no início da linha do terminal), instale o Pandas, Openpyxl e as ferramentas de visão computacional:
+```
 pip install -r requirements.txt
+```
 
-4. Inicie o servidor local do LM Studio
-lms server start
-
-5. Rode o processamento completo (Etapas 1 + 2)
-python step2_llm/processor.py
-
-💡 Dica: Ao rodar o processor.py, uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
+💡 Dica: Ao rodar o writer.py, pedirá para abrir ou salvar o arquivo xlsx (planilha), após isto uma janela de seleção de arquivo será aberta automaticamente. Basta selecionar um PDF ou imagem de nota fiscal para testar o processamento.
 
 # 🔍 Detalhamento das Etapas
 
@@ -74,3 +84,15 @@ Detecta automaticamente se o arquivo de entrada é um PDF nativo ou uma imagem e
 
 🤖 Etapa 2 — Processamento com LLM Local
 Utiliza o modelo local Qwen2.5-VL-3B-Instruct, aproveitando sua capacidade Vision para interpretar a imagem da nota fiscal de forma orgânica, dispensando o OCR na maioria dos casos. O Tesseract atua de forma complementar e tolerante a falhas (fallback), sendo acionado automaticamente apenas quando a confiança do modelo é baixa.
+
+📊 Etapa 3 — Gravação em planilha Excel
+Grava os dados estruturados em notas_fiscais.xlsx de forma acumulativa — cada nova nota processada adiciona uma linha sem sobrescrever as anteriores.
+Funcionalidades:
+
+Seletor visual para escolher onde salvar a planilha
+Processamento de múltiplas notas de uma vez
+Anti-duplicata por número de NF
+Aba Resumo com totais automáticos
+Aba Itens com todos os produtos detalhados
+Instalação automática das dependências
+
