@@ -196,7 +196,7 @@ def chamar_llm_vision(caminho_imagem: str) -> dict:
         "max_tokens": 2048,
     }
 
-    resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=120)
+    resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=600)
     resposta.raise_for_status()
     conteudo = resposta.json()["choices"][0]["message"]["content"].strip()
     return parse_json(conteudo)

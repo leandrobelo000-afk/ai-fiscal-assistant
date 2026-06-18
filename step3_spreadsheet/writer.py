@@ -19,6 +19,9 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
 
+def gravar_nota(nota_processada, caminho_arquivo="notas_fiscais.xlsx"):
+    pass
+
 def verificar_dependencias():
     import importlib, subprocess
     for lib in ["pandas", "openpyxl"]:
@@ -34,25 +37,6 @@ def verificar_dependencias():
 
 def selecionar_caminho_planilha() -> str:
     """Abre seletor para escolher onde salvar ou abrir a planilha."""
-    import tkinter as tk
-    from tkinter import filedialog
-
-    root = tk.Tk()
-    root.withdraw()
-
-    # Se já existe uma planilha, pergunta se quer abrir ela ou escolher outra
-    caminho = filedialog.asksaveasfilename(
-        title="Salvar planilha em...",
-        defaultextension=".xlsx",
-        initialfile="notas_fiscais.xlsx",
-        filetypes=[("Excel", "*.xlsx")]
-    )
-    return caminho if caminho else None
-
-CAMINHO_PLANILHA = selecionar_caminho_planilha()
-if not CAMINHO_PLANILHA:
-    print("Nenhuma pasta selecionada. Encerrando.")
-    sys.exit(1)
 
 COLUNAS_RESUMO = [
     "Data Processamento",
@@ -97,12 +81,12 @@ def _estilizar_cabecalho(ws, colunas: list, cor: str):
 # Verificação de duplicata
 # ─────────────────────────────────────────────
 
-def ja_existe(numero_nf: str) -> bool:
+def ja_existe(numero_nf: str, caminho_planilha: str) -> bool:
     """Verifica se a nota já foi registrada na planilha."""
-    if not os.path.exists(CAMINHO_PLANILHA):
+    if not os.path.exists(caminho_planilha):
         return False
     try:
-        df = pd.read_excel(CAMINHO_PLANILHA, sheet_name="Resumo")
+        df = pd.read_excel(caminho_planilha, sheet_name="Resumo")
         if "Número NF" in df.columns:
             return str(numero_nf) in df["Número NF"].astype(str).values
     except Exception:
@@ -114,21 +98,21 @@ def ja_existe(numero_nf: str) -> bool:
 # Gravação dos dados
 # ─────────────────────────────────────────────
 
-def gravar_nota(nota) -> bool:
+def gravar_nota(nota, caminho_planilha="notas_fiscais.xlsx") -> bool:
     """
     Recebe um objeto NotaFiscalProcessada (Etapa 2) e grava na planilha.
     Retorna True se gravou, False se a nota já existia.
     """
-    # Verifica duplicata
-    if nota.numero and ja_existe(nota.numero):
+    # Verifica duplicata usando o caminho correto
+    if nota.numero and ja_existe(nota.numero, caminho_planilha):
         print(f"  ⚠  NF {nota.numero} já registrada — ignorando.")
         return False
 
     # Cria planilha se não existir
-    if not os.path.exists(CAMINHO_PLANILHA):
-        criar_planilha()
+    if not os.path.exists(caminho_planilha):
+        criar_planilha(caminho_planilha)
 
-    wb = load_workbook(CAMINHO_PLANILHA)
+    wb = load_workbook(caminho_planilha)
     ws_resumo = wb["Resumo"]
     ws_itens  = wb["Itens"]
 
@@ -163,17 +147,16 @@ def gravar_nota(nota) -> bool:
         ])
 
     # Fórmula de total na aba Resumo (coluna F = Valor Total)
-    # Atualiza célula de total geral logo abaixo dos dados
     total_row = ws_resumo.max_row + 2
     ws_resumo.cell(total_row, 5, "TOTAL GERAL").font = Font(bold=True, name="Arial")
     ws_resumo.cell(total_row, 6, f"=SUM(F2:F{ws_resumo.max_row - 1})").font = Font(bold=True, name="Arial")
 
-    wb.save(CAMINHO_PLANILHA)
+    wb.save(caminho_planilha)
     print(f"  ✅ NF {nota.numero or 'sem número'} gravada com sucesso.")
     return True
 
-"""Cria a planilha com as duas abas e cabeçalhos formatados."""
-def criar_planilha():
+def criar_planilha(caminho_planilha):
+    """Cria a planilha com as duas abas e cabeçalhos formatados."""
     wb = Workbook()
 
     # Aba Resumo
@@ -185,8 +168,8 @@ def criar_planilha():
     ws_itens = wb.create_sheet("Itens")
     _estilizar_cabecalho(ws_itens, COLUNAS_ITENS, COR_CABECALHO_2)
 
-    wb.save(CAMINHO_PLANILHA)
-    print(f"  📊 Planilha criada em: {CAMINHO_PLANILHA}")
+    wb.save(caminho_planilha)
+    print(f"  📊 Planilha criada em: {caminho_planilha}")
 
 
 # ─────────────────────────────────────────────
