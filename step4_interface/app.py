@@ -2,8 +2,10 @@ import sys
 import os
 import tempfile
 import json
+import requests
 import streamlit as st
 import glob
+from dataclasses import asdict
 
 caminho_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if caminho_raiz not in sys.path:
@@ -88,30 +90,61 @@ with col1:
 with col2:
     st.subheader("💬 2. Chat com a Nota Fiscal")
     
+    # Inicia o histórico de mensagens se não existir
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = []
 
+    # Renderiza o histórico na tela (para manter a conversa visível)
     for msg in st.session_state.mensagens:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
-
+    # Fica aguardando o usuário digitar no chat
     pergunta_usuario = st.chat_input("O que você quer saber sobre esta nota?")
 
     if pergunta_usuario:
-        # Verifica se alguma nota já foi processada antes de responder
+        # A SUA VALIDAÇÃO: Verifica se a nota já foi processada!
         if 'nota_atual' not in st.session_state:
-            st.warning("Por favor, processe uma nota fiscal primeiro antes de fazer perguntas.")
+            st.warning("⚠️ Por favor, processe uma nota fiscal primeiro antes de fazer perguntas.")
         else:
+            # 1. Mostra a mensagem do usuário na tela e salva no histórico
             with st.chat_message("user"):
                 st.write(pergunta_usuario)
             st.session_state.mensagens.append({"role": "user", "content": pergunta_usuario})
-            
-            # TODO: No futuro, enviaremos a pergunta + st.session_state['nota_atual'] para o LLM responder
-            resposta_ia = f"Você perguntou: '{pergunta_usuario}'. Em breve, a IA buscará a resposta nos dados da nota extraída!"
-            
+
+            # 2. Spinner de carregamento visual (UX)
+            with st.spinner("A IA está analisando a nota fiscal. Isso pode levar alguns segundos..."):
+                try:
+                    # 3. Converte a nota (dataclass) para JSON
+                    nota_atual = st.session_state['nota_atual']
+                    dados_em_json = json.dumps(asdict(nota_atual), indent=2, ensure_ascii=False)
+
+                    # 4. Monta o Payload para a API (O formulário da Recepcionista)
+                    payload = {
+                        "model": "qwen2.5-vl-3b-instruct",
+                        "temperature": 0.1,
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": f"Você é um analista financeiro prestativo que fala português e realiza a análise de notas fiscais brasileiras.\nResponda APENAS com base nos dados fornecidos abaixo:\n\n{dados_em_json}"
+                            },
+                            {"role": "user", "content": pergunta_usuario}
+                        ]
+                    }
+
+                    # 5. O carteiro envia a carta (POST)
+                    url_api = "http://localhost:1234/v1/chat/completions"
+                    resposta_requisicao = requests.post(url_api, json=payload)
+                    
+                    # 6. Extrai o texto limpo da resposta JSON
+                    texto_final = resposta_requisicao.json()["choices"][0]["message"]["content"]
+
+                except Exception as e:
+                    texto_final = f"❌ Erro ao comunicar com a IA local: {str(e)}"
+
+            # 7. Mostra a resposta da IA na tela e salva no histórico
             with st.chat_message("assistant"):
-                st.write(resposta_ia)
-            st.session_state.mensagens.append({"role": "assistant", "content": resposta_ia})
+                st.write(texto_final)
+            st.session_state.mensagens.append({"role": "assistant", "content": texto_final})
 
     # ==========================================
     # NOVO: VISUALIZADOR DA PLANILHA NA TELA
