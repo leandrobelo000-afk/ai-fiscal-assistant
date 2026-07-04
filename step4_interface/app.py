@@ -23,6 +23,8 @@ verificar_tesseract()
 
 # 1. Configuração da Página
 st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+
+
 # ==========================================
 # BARRA LATERAL (CONFIGURAÇÕES)
 # ==========================================
@@ -30,21 +32,37 @@ with st.sidebar:
     st.header("⚙️ Configurações do Sistema")
     st.write("Escolha onde os dados serão salvos/lidos:")
     
-    # O glob varre toda a sua pasta do projeto procurando arquivos do Excel
+    # 1. Busca as planilhas existentes
     planilhas_encontradas = glob.glob("**/*.xlsx", recursive=True)
     
+    # 2. Exibe o SelectBox (se existirem planilhas)
     if planilhas_encontradas:
-        # Se encontrar, cria um menu (dropdown) para você selecionar
-        caminho_planilha = st.selectbox("📁 Banco de Dados Atual:", planilhas_encontradas)
+        planilha_selecionada = st.selectbox("📁 Banco de Dados Atual:", planilhas_encontradas)
     else:
-        # Se não encontrar nenhuma, abre um campo para você digitar o nome de uma nova
-        caminho_planilha = st.text_input("📁 Nome do novo banco de dados:", value="notas_fiscais.xlsx")
-        st.caption("O arquivo será criado automaticamente ao processar a próxima nota.")
-st.title("🧾 AI Fiscal Assistant - Central")
-st.write("Faça o upload, extraia os dados, salve na planilha e converse com a nota!")
+        planilha_selecionada = "notas_fiscais.xlsx" # Nome padrão de fallback
 
-# Layout em duas colunas (Esquerda: Upload/Resultados | Direita: Chat)
-col1, col2 = st.columns([1, 1])
+    # 3. Exibe SEMPRE o campo para criar uma nova
+    nova_planilha = st.text_input("✨ Ou crie uma nova (ex: notas_maio):")
+
+    # 4. A Regra de Negócio (Quem ganha?)
+    if nova_planilha: # Se o usuário digitou qualquer coisa no campo de texto...
+        # Verifica se ele esqueceu de digitar ".xlsx" no final
+        if not nova_planilha.endswith(".xlsx"):
+            nova_planilha += ".xlsx"
+        
+        caminho_planilha = nova_planilha # O texto digitado VENCE
+    else:
+        caminho_planilha = planilha_selecionada # O dropdown VENCE
+        
+    # Feedback visual para o usuário ter certeza de onde está salvando
+    st.success(f"📌 Usando banco: {caminho_planilha}")
+
+
+# ==========================================
+# ÁREA PRINCIPAL: COLUNAS
+# ==========================================
+# Cria a fundação da interface dividida em duas metades
+col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📤 1. Upload e Processamento")
@@ -71,9 +89,9 @@ with col1:
                     
                     # PASSO C: Executar a Etapa 3 (Gravar na Planilha)
                     st.toast("Salvando na planilha...")
-                    gravar_nota(nota_processada)
-                    st.toast("Salvando na planilha...")
-                    gravar_nota(nota_processada, caminho_planilha)
+                    
+                    # Usa a variável dinâmica definida lá na Sidebar!
+                    gravar_nota(nota_processada, caminho_planilha) 
                     
                     st.success("✅ Nota processada e salva na planilha com sucesso!")
                     
@@ -86,7 +104,6 @@ with col1:
                     # PASSO D: Limpeza - deleta o arquivo temporário para não lotar o PC
                     if 'caminho_temp' in locals() and os.path.exists(caminho_temp):
                         os.remove(caminho_temp)
-
 with col2:
     st.subheader("💬 2. Chat com a Nota Fiscal")
     

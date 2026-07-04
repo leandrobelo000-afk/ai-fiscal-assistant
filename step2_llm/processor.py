@@ -85,6 +85,42 @@ FORMATO DE RESPOSTA:
 PROMPT_VISION = "Extraia todos os dados desta nota fiscal. Responda apenas com o JSON."
 
 
+def limpar_valor_monetario(valor_bruto):
+    if valor_bruto is None:
+        return 0.0
+    
+    # Se já for um número (float ou int), devolve direto
+    if isinstance(valor_bruto, (float, int)):
+        return float(valor_bruto)
+        
+    # Converte para string, remove R$, espaços em branco e letras
+    texto = str(valor_bruto).replace("R$", "").strip()
+    
+    if not texto:
+        return 0.0
+
+    # Cenário 1: Formato perfeito BR (ex: 1.163,38)
+    if "." in texto and "," in texto:
+        texto = texto.replace(".", "") # Tira o ponto de milhar
+        texto = texto.replace(",", ".") # Troca a vírgula decimal por ponto
+
+    # Cenário 2: Erro de OCR com múltiplos pontos (ex: 1.163.38)
+    elif texto.count(".") > 1:
+        # Separa pelo ÚLTIMO ponto. O que estiver à direita são os centavos.
+        partes = texto.rsplit(".", 1) 
+        # Junta a parte da esquerda (tirando pontos extras) com a direita
+        texto = partes[0].replace(".", "") + "." + partes[1]
+        
+    # Cenário 3: Apenas vírgula (ex: 163,38)
+    elif "," in texto:
+        texto = texto.replace(",", ".")
+        
+    try:
+        return float(texto)
+    except ValueError:
+        # Se a IA alucinar um texto completamente maluco, evitamos que o sistema caia
+        return 0.0
+
 def PROMPT_TEXTO(texto):
     return f"Extraia os dados desta nota fiscal. O texto foi obtido por OCR e pode ter erros:\n\n{texto}\n\nResponda apenas com o JSON."
 
@@ -153,8 +189,8 @@ def parse_json(conteudo: str) -> dict:
             "data_emissao":  re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo).group(1),
             "cnpj_emitente": re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
             "nome_emitente": re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "valor_total":   float(re.search(r'"valor_total"\s*:\s*([\d.]+)', conteudo).group(1)) if re.search(r'"valor_total"\s*:\s*([\d.]+)', conteudo) else None,
-            "impostos":      float(re.search(r'"impostos"\s*:\s*([\d.]+)', conteudo).group(1)) if re.search(r'"impostos"\s*:\s*([\d.]+)', conteudo) else None,
+            "valor_total":   limpar_valor_monetario(re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo) else None,
+            "impostos":      limpar_valor_monetario(re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo) else None,
             "itens":         [],
             "confianca":     "media",
         }
@@ -166,8 +202,9 @@ def montar_nota(dados: dict, rota: str) -> NotaFiscalProcessada:
         data_emissao  = dados.get("data_emissao"),
         cnpj_emitente = dados.get("cnpj_emitente"),
         nome_emitente = dados.get("nome_emitente"),
-        valor_total   = dados.get("valor_total"),
-        impostos      = dados.get("impostos"),
+        # O ESCUDO ENTRA AQUI 👇
+        valor_total   = limpar_valor_monetario(dados.get("valor_total")),
+        impostos      = limpar_valor_monetario(dados.get("impostos")),
         itens         = dados.get("itens", []),
         confianca     = dados.get("confianca", "media"),
         rota          = rota,
@@ -199,7 +236,17 @@ def chamar_llm_vision(caminho_imagem: str) -> dict:
     resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=600)
     resposta.raise_for_status()
     conteudo = resposta.json()["choices"][0]["message"]["content"].strip()
-    return parse_json(conteudo)
+    print("  ⚠ JSON corrompido — extraindo campos manualmente...")
+    return {
+            "numero":        re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo).group(1),
+            "data_emissao":  re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo).group(1),
+            "cnpj_emitente": re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
+            "nome_emitente": re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
+            "valor_total":   limpar_valor_monetario(re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo) else None,
+            "impostos":      limpar_valor_monetario(re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo) else None,
+            "itens":         [],
+            "confianca":     "media",
+        }
 
 
 # ─────────────────────────────────────────────
@@ -281,7 +328,7 @@ def processar_nota_fiscal(caminho: str) -> NotaFiscalProcessada:
         if "impostos" in campos_ausentes:
             match = re.search(r'Tributos\s+Totais[^\n]*\n\s*R[S$]?\s*([\d]+[,\.]\d{2})', texto_ocr, re.IGNORECASE)
             if match:
-                nota.impostos = float(match.group(1).replace('.', '').replace(',', '.'))
+                nota.impostos = limpar_valor_monetario(match.group(1))
                 print(f"  ✔ Impostos encontrados pelo Tesseract: {nota.impostos}")
             else:
                 nota.impostos = 0.0  # tributos zero é comum em NFC-e
