@@ -119,4 +119,26 @@ streamlit run step5_dashboard/app.py
 - **Filtros** de período e fornecedor na barra lateral, e **exportação para Excel** do recorte atual, gerada a partir da base.
 - Os cálculos ficam em `analytics.py`, separados da interface e cobertos por testes.
 
-**Próximas fases:** 5.2 Google Sheets + Looker Studio · 5.3 IA analítica (categorias, anomalias, chat com a base).
+### ☁️ Etapa 5.2 — Google Sheets + Looker Studio
+A base SQLite é espelhada em uma planilha do Google Sheets (abas **Notas**, **Itens** e **Resumo Mensal**), que serve de fonte para um painel no Looker Studio. A sincronização é de mão única e reescreve as abas inteiras, então nunca duplica linhas.
+
+**Configuração (uma vez):**
+1. No [Google Cloud Console](https://console.cloud.google.com/), ative a **Google Sheets API** e a **Google Drive API**.
+2. Crie uma **conta de serviço** (IAM e administrador > Contas de serviço) e gere uma chave **JSON**.
+3. Salve a chave em `credenciais/google-service-account.json` (a pasta está no `.gitignore`; nunca publique esse arquivo).
+4. Crie uma planilha em branco e **compartilhe** com o e-mail da conta de serviço como **Editor**.
+5. Copie `.env.exemplo` para `.env` e preencha `GOOGLE_SHEET_ID` (o trecho da URL entre `/d/` e `/edit`).
+
+**Uso:** depois de configurado, cada nota processada atualiza a planilha automaticamente. Também dá para sincronizar pelo botão **Sincronizar com Google Sheets** na Visão Geral, ou pelo terminal:
+```bash
+python step5_dashboard/sheets_sync.py
+```
+
+**Painel no Looker Studio:**
+1. Em [lookerstudio.google.com](https://lookerstudio.google.com/), crie um relatório e adicione a fonte **Planilhas Google**, escolhendo a aba **Notas** (marque "Usar a primeira linha como cabeçalho").
+2. Confira os tipos dos campos: `data_emissao` como **Data**, `valor_total` e `impostos` como **Moeda (BRL)**.
+3. Sugestão de páginas: indicadores (soma de `valor_total`, contagem de notas, soma de `impostos`), série temporal por `data_emissao` (mês), barras por `fornecedor` e um controle de período.
+4. Adicione a aba **Itens** como segunda fonte para a página de itens.
+5. Em **Compartilhar**, gere um link de visualização para o portfólio.
+
+**Próxima fase:** 5.3 IA analítica (categorias, anomalias, chat com a base).
