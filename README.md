@@ -12,7 +12,8 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision com LLM local (Qwen2.5-VL) |
 | 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação acumulativa e inteligente em planilha Excel |
 | 4 | `step4_interface/` | ✅ Concluída | Interface visual interativa de upload, visualização e chat |
-| 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro e analytics |
+| 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro, analytics e integração com Google Sheets
+
 
 ---
 
