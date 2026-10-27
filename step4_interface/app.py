@@ -17,6 +17,7 @@ if caminho_raiz not in sys.path:
 
 from step2_llm.processor import processar_nota_fiscal
 from step3_spreadsheet.writer import gravar_nota
+from step5_dashboard.database import salvar_nota
 from step1_ocr.extractor import verificar_tesseract
 
 verificar_tesseract()
@@ -69,9 +70,9 @@ with col1:
                     # Salva os dados na memória da sessão para o Chat poder usar depois
                     st.session_state['nota_atual'] = nota_processada
                     
-                    # PASSO C: Executar a Etapa 3 (Gravar na Planilha)
-                    st.toast("Salvando na planilha...")
-                    gravar_nota(nota_processada)
+                    # PASSO C: Gravar na base SQLite (fonte única, Etapa 5) e na planilha (Etapa 3)
+                    st.toast("Salvando na base de dados...")
+                    salvar_nota(nota_processada)
                     st.toast("Salvando na planilha...")
                     gravar_nota(nota_processada, caminho_planilha)
                     

@@ -232,9 +232,9 @@ def chamar_llm_texto(texto_ocr: str) -> dict:
         "max_tokens": 1024,
     }
 
-    resposta = requests.post(LM_STUDIO_URL, on=payload, timeout=60)
+    resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=60)
     resposta.raise_for_status()
-    conteudo = resposta.json()["choices"]["0 message"]["content"].strip()
+    conteudo = resposta.json()["choices"][0]["message"]["content"].strip()
     return parse_json(conteudo)
 
 

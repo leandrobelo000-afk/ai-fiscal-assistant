@@ -12,7 +12,7 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision com LLM local (Qwen2.5-VL) |
 | 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação acumulativa e inteligente em planilha Excel |
 | 4 | `step4_interface/` | ✅ Concluída | Interface visual interativa de upload, visualização e chat |
-| 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro, analytics e integração com Google Sheets
+| 5 | `step5_dashboard/` | 🚧 Em andamento | Dashboard financeiro, analytics e integração com Google Sheets |
 
 
 ---
@@ -100,3 +100,12 @@ O arquivo `app.py` orquestra todas as etapas anteriores em uma interface de usu�
 - **Integração de Módulos:** Chama as funções de OCR, Vision e gravação em planilha de forma sequencial.
 - **Visualizador Integrado:** Lê diretamente o arquivo Excel gerado (Aba Resumo e Itens) e exibe os dados processados na própria tela usando `pandas`.
 - **Chat Contextual (Em desenvolvimento):** Preparação de UI para permitir perguntas e respostas baseadas nos dados da nota fiscal recém processada.
+
+### 🗄️ Etapa 5.0 — Fundação de Dados (SQLite)
+Antes do dashboard, os dados passam a viver em uma base SQLite (`notas_fiscais.db`), que vira a fonte única. O Excel continua sendo gerado e, nas próximas fases, o Google Sheets também.
+- **Chave única:** uma nota é identificada por CNPJ do emitente + número, então fornecedores diferentes com o mesmo número não são descartados.
+- **Tipos corretos:** datas em ISO (`AAAA-MM-DD`), CNPJ só com dígitos e valores como número, prontos para agrupar por mês e fornecedor.
+- **Migração:** `python step5_dashboard/database.py notas_fiscais.xlsx` importa uma planilha antiga, ignorando as linhas "TOTAL GERAL".
+- **Testes:** `pytest` roda os testes da base e da planilha.
+
+**Próximas fases:** 5.1 Dashboard (Streamlit + Plotly) · 5.2 Google Sheets + Looker Studio · 5.3 IA analítica (categorias, anomalias, chat com a base).
