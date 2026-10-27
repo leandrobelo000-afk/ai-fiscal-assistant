@@ -1,7 +1,7 @@
 import plotly.express as px
 import streamlit as st
 
-from step5_dashboard import analytics, componentes as ui
+from step5_dashboard import analytics, componentes as ui, sheets_sync
 from step5_dashboard.exportacao import exportar_excel
 
 st.title("📊 Visão Geral")
@@ -23,6 +23,16 @@ with st.sidebar:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
+    if sheets_sync.configurado():
+        if st.button("🔄 Sincronizar com Google Sheets", use_container_width=True):
+            try:
+                with st.spinner("Enviando para o Google Sheets..."):
+                    enviados = sheets_sync.sincronizar()
+                st.success(f"Planilha atualizada: {enviados['Notas']} nota(s), {enviados['Itens']} item(ns).")
+            except Exception as e:
+                st.error(f"Falha ao sincronizar: {e}")
+    else:
+        st.caption("Google Sheets não configurado. Veja a seção da Etapa 5.2 no README.")
 
 if filtradas.empty:
     st.warning("Nenhuma nota no período e fornecedores escolhidos.")
