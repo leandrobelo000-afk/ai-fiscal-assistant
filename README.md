@@ -12,7 +12,7 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision com LLM local (Qwen2.5-VL) |
 | 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação acumulativa e inteligente em planilha Excel |
 | 4 | `step4_interface/` | ✅ Concluída | Interface visual interativa de upload, visualização e chat |
-| 5 | `step5_dashboard/` | 🔜 Em breve | Dashboard financeiro, analytics e integração com Google Sheets
+| 5 | `step5_dashboard/` | 🚧 Em andamento | Dashboard financeiro, analytics e integração com Google Sheets |
 
 
 ---
@@ -87,7 +87,7 @@ pip install -r requirements.txt
 1. No **LM Studio**, inicie o servidor local na porta `1234`.
 2. No seu terminal, rode o comando:
 ```bash
-streamlit run step4_interface/app.py
+streamlit run step5_dashboard/app.py
 ```
 
 ---
@@ -100,3 +100,45 @@ O arquivo `app.py` orquestra todas as etapas anteriores em uma interface de usu�
 - **Integração de Módulos:** Chama as funções de OCR, Vision e gravação em planilha de forma sequencial.
 - **Visualizador Integrado:** Lê diretamente o arquivo Excel gerado (Aba Resumo e Itens) e exibe os dados processados na própria tela usando `pandas`.
 - **Chat Contextual (Em desenvolvimento):** Preparação de UI para permitir perguntas e respostas baseadas nos dados da nota fiscal recém processada.
+
+### 🗄️ Etapa 5.0 — Fundação de Dados (SQLite)
+Antes do dashboard, os dados passam a viver em uma base SQLite (`notas_fiscais.db`), que vira a fonte única. O Excel continua sendo gerado e, nas próximas fases, o Google Sheets também.
+- **Chave única:** uma nota é identificada por CNPJ do emitente + número, então fornecedores diferentes com o mesmo número não são descartados.
+- **Tipos corretos:** datas em ISO (`AAAA-MM-DD`), CNPJ só com dígitos e valores como número, prontos para agrupar por mês e fornecedor.
+- **Migração:** `python step5_dashboard/database.py notas_fiscais.xlsx` importa uma planilha antiga, ignorando as linhas "TOTAL GERAL".
+- **Testes:** `pytest` roda os testes da base e da planilha.
+
+### 📊 Etapa 5.1 — Dashboard Financeiro (Streamlit + Plotly)
+Um único app junta a tela de processamento da Etapa 4 e o dashboard, lendo direto da base SQLite:
+```bash
+streamlit run step5_dashboard/app.py
+```
+- **Visão Geral:** gasto total (com variação contra o mês anterior), nº de notas, ticket médio, impostos e carga tributária; gasto por mês e maiores fornecedores.
+- **Fornecedores:** curva ABC (A = até 80% do gasto, B = até 95%, C = o restante) com gráfico e tabela.
+- **Itens:** itens com maior gasto e busca por descrição.
+- **Filtros** de período e fornecedor na barra lateral, e **exportação para Excel** do recorte atual, gerada a partir da base.
+- Os cálculos ficam em `analytics.py`, separados da interface e cobertos por testes.
+
+### ☁️ Etapa 5.2 — Google Sheets + Looker Studio
+A base SQLite é espelhada em uma planilha do Google Sheets (abas **Notas**, **Itens** e **Resumo Mensal**), que serve de fonte para um painel no Looker Studio. A sincronização é de mão única e reescreve as abas inteiras, então nunca duplica linhas.
+
+**Configuração (uma vez):**
+1. No [Google Cloud Console](https://console.cloud.google.com/), ative a **Google Sheets API** e a **Google Drive API**.
+2. Crie uma **conta de serviço** (IAM e administrador > Contas de serviço) e gere uma chave **JSON**.
+3. Salve a chave em `credenciais/google-service-account.json` (a pasta está no `.gitignore`; nunca publique esse arquivo).
+4. Crie uma planilha em branco e **compartilhe** com o e-mail da conta de serviço como **Editor**.
+5. Copie `.env.exemplo` para `.env` e preencha `GOOGLE_SHEET_ID` (o trecho da URL entre `/d/` e `/edit`).
+
+**Uso:** depois de configurado, cada nota processada atualiza a planilha automaticamente. Também dá para sincronizar pelo botão **Sincronizar com Google Sheets** na Visão Geral, ou pelo terminal:
+```bash
+python step5_dashboard/sheets_sync.py
+```
+
+**Painel no Looker Studio:**
+1. Em [lookerstudio.google.com](https://lookerstudio.google.com/), crie um relatório e adicione a fonte **Planilhas Google**, escolhendo a aba **Notas** (marque "Usar a primeira linha como cabeçalho").
+2. Confira os tipos dos campos: `data_emissao` como **Data**, `valor_total` e `impostos` como **Moeda (BRL)**.
+3. Sugestão de páginas: indicadores (soma de `valor_total`, contagem de notas, soma de `impostos`), série temporal por `data_emissao` (mês), barras por `fornecedor` e um controle de período.
+4. Adicione a aba **Itens** como segunda fonte para a página de itens.
+5. Em **Compartilhar**, gere um link de visualização para o portfólio.
+
+**Próxima fase:** 5.3 IA analítica (categorias, anomalias, chat com a base).

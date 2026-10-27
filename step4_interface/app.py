@@ -17,12 +17,18 @@ if caminho_raiz not in sys.path:
 
 from step2_llm.processor import processar_nota_fiscal
 from step3_spreadsheet.writer import gravar_nota
+from step5_dashboard.database import salvar_nota
+from step5_dashboard import sheets_sync
 from step1_ocr.extractor import verificar_tesseract
 
 verificar_tesseract()
 
 # 1. Configuração da Página
-st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+# Quando roda dentro do app da Etapa 5, a configuração já foi feita lá
+try:
+    st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+except st.errors.StreamlitAPIException:
+    pass
 # ==========================================
 # BARRA LATERAL (CONFIGURAÇÕES)
 # ==========================================
@@ -69,11 +75,19 @@ with col1:
                     # Salva os dados na memória da sessão para o Chat poder usar depois
                     st.session_state['nota_atual'] = nota_processada
                     
-                    # PASSO C: Executar a Etapa 3 (Gravar na Planilha)
-                    st.toast("Salvando na planilha...")
-                    gravar_nota(nota_processada)
+                    # PASSO C: Gravar na base SQLite (fonte única, Etapa 5) e na planilha (Etapa 3)
+                    st.toast("Salvando na base de dados...")
+                    salvar_nota(nota_processada)
                     st.toast("Salvando na planilha...")
                     gravar_nota(nota_processada, caminho_planilha)
+
+                    # PASSO D: Espelhar no Google Sheets, se configurado (Etapa 5.2)
+                    if sheets_sync.configurado():
+                        try:
+                            sheets_sync.sincronizar()
+                            st.toast("Google Sheets atualizado.")
+                        except Exception as e:
+                            st.warning(f"Nota salva, mas o Google Sheets não foi atualizado: {e}")
                     
                     st.success("✅ Nota processada e salva na planilha com sucesso!")
                     
@@ -83,7 +97,7 @@ with col1:
                 except Exception as e:
                     st.error(f"Ocorreu um erro no processamento: {e}")
                 finally:
-                    # PASSO D: Limpeza - deleta o arquivo temporário para não lotar o PC
+                    # PASSO E: Limpeza - deleta o arquivo temporário para não lotar o PC
                     if 'caminho_temp' in locals() and os.path.exists(caminho_temp):
                         os.remove(caminho_temp)
 

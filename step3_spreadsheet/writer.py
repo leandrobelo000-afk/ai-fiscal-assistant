@@ -19,9 +19,6 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 from datetime import datetime
 
-def gravar_nota(nota_processada, caminho_arquivo="notas_fiscais.xlsx"):
-    pass
-
 def verificar_dependencias():
     import importlib, subprocess
     for lib in ["pandas", "openpyxl"]:
@@ -35,8 +32,7 @@ def verificar_dependencias():
 # Configuração
 # ─────────────────────────────────────────────
 
-def selecionar_caminho_planilha() -> str:
-    """Abre seletor para escolher onde salvar ou abrir a planilha."""
+CAMINHO_PLANILHA = "notas_fiscais.xlsx"
 
 COLUNAS_RESUMO = [
     "Data Processamento",
@@ -48,6 +44,8 @@ COLUNAS_RESUMO = [
     "Impostos (R$)",
     "Qtd Itens",
 ]
+
+COLUNA_TOTAL = len(COLUNAS_RESUMO) + 2   # coluna J, separada por uma coluna vazia
 
 COLUNAS_ITENS = [
     "Número NF",
@@ -81,30 +79,55 @@ def _estilizar_cabecalho(ws, colunas: list, cor: str):
 # Verificação de duplicata
 # ─────────────────────────────────────────────
 
-def ja_existe(numero_nf: str, caminho_planilha: str) -> bool:
-    """Verifica se a nota já foi registrada na planilha."""
+def _so_digitos(valor) -> str:
+    return "".join(c for c in str(valor) if c.isdigit()) if valor is not None else ""
+
+
+def ja_existe(numero_nf: str, caminho_planilha: str, cnpj_emitente: str = None) -> bool:
+    """
+    Verifica se a nota já foi registrada na planilha.
+    A mesma nota = mesmo número E mesmo CNPJ do emitente (fornecedores
+    diferentes podem emitir notas com o mesmo número).
+    """
     if not os.path.exists(caminho_planilha):
         return False
     try:
-        df = pd.read_excel(caminho_planilha, sheet_name="Resumo")
-        if "Número NF" in df.columns:
-            return str(numero_nf) in df["Número NF"].astype(str).values
+        df = pd.read_excel(caminho_planilha, sheet_name="Resumo", dtype=str)
+        if "Número NF" not in df.columns:
+            return False
+        mesmo_numero = df["Número NF"].str.removesuffix(".0") == str(numero_nf)
+        if cnpj_emitente is None or "CNPJ Emitente" not in df.columns:
+            return bool(mesmo_numero.any())
+        mesmo_cnpj = df["CNPJ Emitente"].map(_so_digitos) == _so_digitos(cnpj_emitente)
+        return bool((mesmo_numero & mesmo_cnpj).any())
     except Exception:
         pass
     return False
+
+
+def _remover_totais_antigos(ws):
+    """
+    Versões anteriores gravavam uma linha "TOTAL GERAL" (+ uma linha vazia) a cada nota,
+    no meio dos dados. Remove essas linhas para o SUM da coluna J não contar em dobro.
+    """
+    for linha in range(ws.max_row, 1, -1):
+        rotulo = ws.cell(linha, 5).value
+        vazia = all(ws.cell(linha, c).value is None for c in range(1, len(COLUNAS_RESUMO) + 1))
+        if rotulo == "TOTAL GERAL" or vazia:
+            ws.delete_rows(linha)
 
 
 # ─────────────────────────────────────────────
 # Gravação dos dados
 # ─────────────────────────────────────────────
 
-def gravar_nota(nota, caminho_planilha="notas_fiscais.xlsx") -> bool:
+def gravar_nota(nota, caminho_planilha=CAMINHO_PLANILHA) -> bool:
     """
     Recebe um objeto NotaFiscalProcessada (Etapa 2) e grava na planilha.
     Retorna True se gravou, False se a nota já existia.
     """
     # Verifica duplicata usando o caminho correto
-    if nota.numero and ja_existe(nota.numero, caminho_planilha):
+    if nota.numero and ja_existe(nota.numero, caminho_planilha, nota.cnpj_emitente):
         print(f"  ⚠  NF {nota.numero} já registrada — ignorando.")
         return False
 
@@ -115,6 +138,7 @@ def gravar_nota(nota, caminho_planilha="notas_fiscais.xlsx") -> bool:
     wb = load_workbook(caminho_planilha)
     ws_resumo = wb["Resumo"]
     ws_itens  = wb["Itens"]
+    _remover_totais_antigos(ws_resumo)
 
     # Linha de resumo
     linha_resumo = [
@@ -146,10 +170,10 @@ def gravar_nota(nota, caminho_planilha="notas_fiscais.xlsx") -> bool:
             item.get("valor"),
         ])
 
-    # Fórmula de total na aba Resumo (coluna F = Valor Total)
-    total_row = ws_resumo.max_row + 2
-    ws_resumo.cell(total_row, 5, "TOTAL GERAL").font = Font(bold=True, name="Arial")
-    ws_resumo.cell(total_row, 6, f"=SUM(F2:F{ws_resumo.max_row - 1})").font = Font(bold=True, name="Arial")
+    # Total geral fora da área de dados (coluna J), para não se misturar com as notas
+    # nem ser somado de novo a cada gravação. SUM(F:F) ignora o cabeçalho (texto).
+    ws_resumo.cell(1, COLUNA_TOTAL, "TOTAL GERAL").font = Font(bold=True, name="Arial")
+    ws_resumo.cell(2, COLUNA_TOTAL, "=SUM(F:F)").font = Font(bold=True, name="Arial")
 
     wb.save(caminho_planilha)
     print(f"  ✅ NF {nota.numero or 'sem número'} gravada com sucesso.")

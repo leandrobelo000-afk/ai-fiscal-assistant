@@ -31,6 +31,6 @@ pip install -r requirements.txt > nul
 echo.
 echo [*] Tudo pronto! Abrindo a interface do sistema...
 echo ===================================================
-streamlit run step4_interface/app.py
+streamlit run step5_dashboard/app.py
 
 pause
