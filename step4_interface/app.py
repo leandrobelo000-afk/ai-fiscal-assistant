@@ -23,7 +23,11 @@ from step1_ocr.extractor import verificar_tesseract
 verificar_tesseract()
 
 # 1. Configuração da Página
-st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+# Quando roda dentro do app da Etapa 5, a configuração já foi feita lá
+try:
+    st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+except st.errors.StreamlitAPIException:
+    pass
 # ==========================================
 # BARRA LATERAL (CONFIGURAÇÕES)
 # ==========================================

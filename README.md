@@ -87,7 +87,7 @@ pip install -r requirements.txt
 1. No **LM Studio**, inicie o servidor local na porta `1234`.
 2. No seu terminal, rode o comando:
 ```bash
-streamlit run step4_interface/app.py
+streamlit run step5_dashboard/app.py
 ```
 
 ---
@@ -108,4 +108,15 @@ Antes do dashboard, os dados passam a viver em uma base SQLite (`notas_fiscais.d
 - **Migração:** `python step5_dashboard/database.py notas_fiscais.xlsx` importa uma planilha antiga, ignorando as linhas "TOTAL GERAL".
 - **Testes:** `pytest` roda os testes da base e da planilha.
 
-**Próximas fases:** 5.1 Dashboard (Streamlit + Plotly) · 5.2 Google Sheets + Looker Studio · 5.3 IA analítica (categorias, anomalias, chat com a base).
+### 📊 Etapa 5.1 — Dashboard Financeiro (Streamlit + Plotly)
+Um único app junta a tela de processamento da Etapa 4 e o dashboard, lendo direto da base SQLite:
+```bash
+streamlit run step5_dashboard/app.py
+```
+- **Visão Geral:** gasto total (com variação contra o mês anterior), nº de notas, ticket médio, impostos e carga tributária; gasto por mês e maiores fornecedores.
+- **Fornecedores:** curva ABC (A = até 80% do gasto, B = até 95%, C = o restante) com gráfico e tabela.
+- **Itens:** itens com maior gasto e busca por descrição.
+- **Filtros** de período e fornecedor na barra lateral, e **exportação para Excel** do recorte atual, gerada a partir da base.
+- Os cálculos ficam em `analytics.py`, separados da interface e cobertos por testes.
+
+**Próximas fases:** 5.2 Google Sheets + Looker Studio · 5.3 IA analítica (categorias, anomalias, chat com a base).
