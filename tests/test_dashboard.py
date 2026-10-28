@@ -61,3 +61,16 @@ def test_exportar_excel(na_pasta_com_banco):
     resumo = wb["Resumo"]
     assert resumo["D2"].value == "11.111.111/0001-11"
     assert resumo.max_row == 4
+
+
+def test_pagina_processar_nota_sem_tesseract(tmp_path, monkeypatch):
+    """A tela da Etapa 4 abre mesmo quando o Tesseract não pode ser instalado."""
+    monkeypatch.chdir(tmp_path)
+    from step1_ocr import extractor
+    monkeypatch.setattr(extractor, "_localizar_tesseract", lambda: None)
+    monkeypatch.setattr(extractor.platform, "system", lambda: "Linux")
+    from streamlit.testing.v1 import AppTest
+    app = os.path.join(os.path.dirname(PASTA), "..", "step4_interface", "app.py")
+    at = AppTest.from_file(app, default_timeout=30).run()
+    assert not at.exception
+    assert "Tesseract" in at.warning[0].value

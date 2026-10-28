@@ -21,7 +21,10 @@ from step5_dashboard.database import salvar_nota
 from step5_dashboard import sheets_sync
 from step1_ocr.extractor import verificar_tesseract
 
-verificar_tesseract()
+@st.cache_resource(show_spinner="Verificando o Tesseract...")
+def _tesseract_disponivel() -> bool:
+    # Uma vez por sessão do servidor: evita repetir a instalação (e o aviso do UAC) a cada clique
+    return verificar_tesseract()
 
 # 1. Configuração da Página
 # Quando roda dentro do app da Etapa 5, a configuração já foi feita lá
@@ -47,6 +50,14 @@ with st.sidebar:
         caminho_planilha = st.text_input("📁 Nome do novo banco de dados:", value="notas_fiscais.xlsx")
         st.caption("O arquivo será criado automaticamente ao processar a próxima nota.")
 st.title("🧾 AI Fiscal Assistant - Central")
+
+if not _tesseract_disponivel():
+    st.warning(
+        "⚠️ Tesseract não está instalado, então o OCR de apoio fica desligado. "
+        "A leitura pelo modelo Vision continua funcionando. Para ativar, instale o "
+        "[Tesseract para Windows](https://github.com/UB-Mannheim/tesseract/wiki) "
+        "e reinicie o app."
+    )
 st.write("Faça o upload, extraia os dados, salve na planilha e converse com a nota!")
 
 # Layout em duas colunas (Esquerda: Upload/Resultados | Direita: Chat)

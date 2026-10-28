@@ -270,7 +270,11 @@ def processar_nota_fiscal(caminho: str) -> NotaFiscalProcessada:
     if campos_ausentes:
         print(f"  🔍 Complementando com Tesseract: {campos_ausentes}...")
         import re
-        texto_ocr = extrair_com_tesseract(caminho)
+        try:
+            texto_ocr = extrair_com_tesseract(caminho)
+        except Exception as e:  # Tesseract ausente ou falha no OCR: segue só com a Vision
+            print(f"  ⚠ Tesseract indisponível, mantendo só a leitura Vision: {e}")
+            return nota
 
         if "numero" in campos_ausentes:
             match = re.search(r'[NKM]FC-e\s+n[oº°0]\s*(\d+)', texto_ocr, re.IGNORECASE)
