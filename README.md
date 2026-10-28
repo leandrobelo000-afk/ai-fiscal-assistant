@@ -90,6 +90,16 @@ pip install -r requirements.txt
 streamlit run step5_dashboard/app.py
 ```
 
+**Erro `did not find executable at ...python.exe`?** O `.venv` foi criado com um Python que não existe mais (por exemplo, depois de atualizar o Python). Apague a pasta e crie de novo:
+```bash
+# Windows (PowerShell):
+Remove-Item -Recurse -Force .venv
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+O `iniciar.bat` já faz isso sozinho.
+
 ---
 
 ## 🔍 Detalhamento das Etapas Recentes

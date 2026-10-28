@@ -11,6 +11,17 @@ start "Servidor LM Studio" cmd /k "lms server start"
 
 timeout /t 5 /nobreak > nul
 
+:: 2a. Se o .venv aponta para um Python que nao existe mais (Python atualizado ou
+:: reinstalado), apaga para ser recriado com o Python atual.
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" --version > nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo [!] Ambiente virtual antigo detectado. Recriando com o Python atual...
+        rmdir /s /q .venv
+    )
+)
+
 :: 2. Verifica se o ambiente virtual (.venv) existe. Se nao, cria.
 if not exist ".venv\Scripts\activate.bat" (
     echo.
