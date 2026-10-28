@@ -42,14 +42,14 @@ flowchart TD
 | **OCR (Fallback)** | `pdfplumber`, `pytesseract`, `opencv-python` |
 | **Vision + LLM** | Qwen2.5-VL-3B-Instruct (via LM Studio local) |
 | **Manipulação de Dados** | `pandas`, `openpyxl` |
-| **Linguagem** | Python 3.11+ |
+| **Linguagem** | Python 3.10+ |
 
 ---
 
 ## ⚙️ Como Rodar Localmente
 
 **Pré-requisitos:**
-- Python 3.11+
+- Python 3.10+
 - Git
 - LM Studio instalado com o modelo `Qwen2.5-VL-3B-Instruct`.
 
