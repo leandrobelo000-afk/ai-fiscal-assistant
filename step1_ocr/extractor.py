@@ -28,28 +28,80 @@ import os
 import subprocess
 import shutil
 
-def verificar_tesseract():
-    caminho_padrao = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    tesseract_no_path = shutil.which("tesseract")
+URL_INSTALADOR_TESSERACT = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
 
+
+def _caminhos_tesseract_windows() -> list:
+    pastas = [
+        os.environ.get("ProgramFiles", r"C:\Program Files"),
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+    ]
+    return [os.path.join(p, "Tesseract-OCR", "tesseract.exe") for p in pastas if p]
+
+
+def _localizar_tesseract():
+    tesseract_no_path = shutil.which("tesseract")
     # Verifica se realmente existe no disco, não só no PATH
     if tesseract_no_path and os.path.isfile(tesseract_no_path):
-        pytesseract.pytesseract.tesseract_cmd = tesseract_no_path
-        print("✔ Tesseract já instalado.")
-        return
+        return tesseract_no_path
+    if platform.system() == "Windows":
+        for caminho in _caminhos_tesseract_windows():
+            if os.path.isfile(caminho):
+                return caminho
+    return None
 
-    if os.path.isfile(caminho_padrao):
-        pytesseract.pytesseract.tesseract_cmd = caminho_padrao
+
+def _instalar_tesseract_windows() -> bool:
+    """
+    Baixa e roda o instalador. O instalador exige administrador: sem elevação,
+    o Windows recusa (WinError 740) e então pedimos a elevação pelo UAC.
+    """
+    instalador = os.path.join(os.environ["TEMP"], "tesseract_setup.exe")
+    subprocess.run(["curl", "-L", URL_INSTALADOR_TESSERACT, "-o", instalador], check=True)
+    try:
+        subprocess.run([instalador, "/S", "/Lang=eng"], check=True)
+    except OSError as e:
+        if getattr(e, "winerror", None) != 740:
+            raise
+        print("  Permissão de administrador necessária. Confirme a janela do Windows (UAC)...")
+        subprocess.run([
+            "powershell", "-NoProfile", "-Command",
+            f"Start-Process -FilePath '{instalador}' -ArgumentList '/S' -Verb RunAs -Wait",
+        ], check=True)
+    return _localizar_tesseract() is not None
+
+
+def verificar_tesseract() -> bool:
+    """
+    Garante que o Tesseract (usado como fallback de OCR) está disponível.
+    Retorna False, sem interromper o programa, se não for possível instalá-lo:
+    a leitura principal pelo modelo Vision continua funcionando sem ele.
+    """
+    caminho = _localizar_tesseract()
+    if caminho:
+        pytesseract.pytesseract.tesseract_cmd = caminho
         print("✔ Tesseract já instalado.")
-        return
+        return True
+
+    if platform.system() != "Windows":
+        print("⚠ Tesseract não encontrado. Instale pelo gerenciador de pacotes (ex.: sudo apt install tesseract-ocr).")
+        return False
 
     print("⚠ Tesseract não encontrado. Instalando...")
-    url = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
-    instalador = os.path.join(os.environ["TEMP"], "tesseract_setup.exe")
-    subprocess.run(["curl", "-L", url, "-o", instalador], check=True)
-    subprocess.run([instalador, "/S", "/Lang=eng"], check=True)
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    try:
+        instalado = _instalar_tesseract_windows()
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"⚠ Não foi possível instalar o Tesseract automaticamente: {e}")
+        instalado = False
+
+    if not instalado:
+        print("  Instale manualmente: " + URL_INSTALADOR_TESSERACT)
+        return False
+
+    pytesseract.pytesseract.tesseract_cmd = _localizar_tesseract()
     print("✔ Tesseract instalado com sucesso.")
+    return True
 
 # ─────────────────────────────────────────────
 # Modelo de dados
