@@ -98,7 +98,7 @@ with col1:
                             sheets_sync.sincronizar()
                             st.toast("Google Sheets atualizado.")
                         except Exception as e:
-                            st.warning(f"Nota salva, mas o Google Sheets não foi atualizado: {e}")
+                            st.warning(f"Nota salva, mas o Google Sheets não foi atualizado: {sheets_sync.mensagem_amigavel(e)}")
                     
                     st.success("✅ Nota processada e salva na planilha com sucesso!")
                     

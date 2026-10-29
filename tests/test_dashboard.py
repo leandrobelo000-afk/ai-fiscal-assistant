@@ -74,3 +74,20 @@ def test_pagina_processar_nota_sem_tesseract(tmp_path, monkeypatch):
     at = AppTest.from_file(app, default_timeout=30).run()
     assert not at.exception
     assert "Tesseract" in at.warning[0].value
+
+
+def test_pagina_google_sheets_guia_o_usuario(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GOOGLE_SHEET_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CREDENTIALS", raising=False)
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(os.path.join(PASTA, "google_sheets.py"), default_timeout=30).run()
+    assert not at.exception
+    assert "Chave" in at.subheader[0].value
+
+    from step5_dashboard import sheets_sync
+    sheets_sync.salvar_chave(b'{"type": "service_account", "client_email": "robo@x.iam.gserviceaccount.com"}')
+    at.run()
+    assert not at.exception
+    assert at.code[0].value == "robo@x.iam.gserviceaccount.com"
+    assert len(at.subheader) == 2  # passo da planilha aparece, sincronizar ainda não

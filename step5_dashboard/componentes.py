@@ -56,3 +56,11 @@ def aviso_sem_dados():
     """Aviso mostrado pelas páginas enquanto a base está vazia."""
     st.info("Nenhuma nota na base ainda. Processe uma nota na página **Processar Nota** "
             "ou migre a planilha antiga com `python step5_dashboard/database.py notas_fiscais.xlsx`.")
+
+
+def link_configurar_sheets():
+    """Atalho para a página de configuração do Google Sheets (só existe dentro do app completo)."""
+    try:
+        st.page_link("paginas/google_sheets.py", label="Conectar ao Google Sheets", icon="☁️")
+    except Exception:
+        st.caption("Google Sheets não configurado: abra a página Google Sheets no menu.")
