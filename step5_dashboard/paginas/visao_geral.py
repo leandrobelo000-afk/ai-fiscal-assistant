@@ -30,9 +30,11 @@ with st.sidebar:
                     enviados = sheets_sync.sincronizar()
                 st.success(f"Planilha atualizada: {enviados['Notas']} nota(s), {enviados['Itens']} item(ns).")
             except Exception as e:
-                st.error(f"Falha ao sincronizar: {e}")
+                st.error(sheets_sync.mensagem_amigavel(e))
+        st.link_button("Abrir planilha no Google", sheets_sync.link_planilha(sheets_sync.configuracao()["sheet_id"]),
+                       use_container_width=True)
     else:
-        st.caption("Google Sheets não configurado. Veja a seção da Etapa 5.2 no README.")
+        ui.link_configurar_sheets()
 
 if filtradas.empty:
     st.warning("Nenhuma nota no período e fornecedores escolhidos.")

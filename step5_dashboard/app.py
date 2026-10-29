@@ -29,5 +29,9 @@ navegacao = st.navigation({
         st.Page(os.path.join(pasta, "paginas", "fornecedores.py"), title="Fornecedores", icon="🏢"),
         st.Page(os.path.join(pasta, "paginas", "itens.py"), title="Itens", icon="🧺"),
     ],
+    "Configurações": [
+        st.Page(os.path.join(pasta, "paginas", "google_sheets.py"), title="Google Sheets", icon="☁️",
+                url_path="google-sheets"),
+    ],
 })
 navegacao.run()

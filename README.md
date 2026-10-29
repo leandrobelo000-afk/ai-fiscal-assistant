@@ -132,12 +132,12 @@ streamlit run step5_dashboard/app.py
 ### ☁️ Etapa 5.2 — Google Sheets + Looker Studio
 A base SQLite é espelhada em uma planilha do Google Sheets (abas **Notas**, **Itens** e **Resumo Mensal**), que serve de fonte para um painel no Looker Studio. A sincronização é de mão única e reescreve as abas inteiras, então nunca duplica linhas.
 
-**Configuração (uma vez):**
-1. No [Google Cloud Console](https://console.cloud.google.com/), ative a **Google Sheets API** e a **Google Drive API**.
-2. Crie uma **conta de serviço** (IAM e administrador > Contas de serviço) e gere uma chave **JSON**.
-3. Salve a chave em `credenciais/google-service-account.json` (a pasta está no `.gitignore`; nunca publique esse arquivo).
-4. Crie uma planilha em branco e **compartilhe** com o e-mail da conta de serviço como **Editor**.
-5. Copie `.env.exemplo` para `.env` e preencha `GOOGLE_SHEET_ID` (o trecho da URL entre `/d/` e `/edit`).
+**Configuração (uma vez, pela tela):** abra o app e vá em **Configurações > Google Sheets**. A página guia em três passos:
+1. **Chave de acesso:** os botões levam direto ao Google Cloud para criar uma **conta de serviço**, baixar a chave **JSON** e ativar a **Google Sheets API**. Depois é só arrastar o arquivo para a página (ele fica em `credenciais/`, que está no `.gitignore`).
+2. **Planilha:** crie uma planilha (botão **Criar planilha nova**), compartilhe com o e-mail da conta de serviço mostrado na tela como **Editor** e cole o link da planilha. O app testa a conexão na hora e, se algo faltar (API desligada, planilha não compartilhada, link errado), diz exatamente o que fazer.
+3. **Sincronizar:** envia as notas e abre a planilha.
+
+Quem já tinha configurado pelo `.env` (`GOOGLE_SHEET_ID` e `GOOGLE_CREDENTIALS`) não precisa mudar nada; o que for salvo pela tela passa a valer no lugar.
 
 **Uso:** depois de configurado, cada nota processada atualiza a planilha automaticamente. Também dá para sincronizar pelo botão **Sincronizar com Google Sheets** na Visão Geral, ou pelo terminal:
 ```bash
