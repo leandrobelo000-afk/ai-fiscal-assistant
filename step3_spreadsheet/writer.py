@@ -1,4 +1,4 @@
-"""
+﻿"""
 step3_spreadsheet/writer.py
 ---------------------------
 Grava os dados extraídos pela Etapa 2 no banco de dados SQLite.
@@ -39,7 +39,7 @@ def verificar_dependencias():
 
 # ─────────────────────────────────────────────
 # Configuração (mantida para compatibilidade)
-# ─────────────────────────────────────────────
+# ─────────────────────
 
 def selecionar_caminho_planilha() -> str:
     """Abre seletor para escolher onde salvar ou abrir a planilha."""
@@ -55,6 +55,8 @@ COLUNAS_RESUMO = [
     "Impostos (R$)",
     "Qtd Itens",
 ]
+
+COLUNA_TOTAL = len(COLUNAS_RESUMO) + 2   # coluna J, separada por uma coluna vazia
 
 COLUNAS_ITENS = [
     "Número NF",
@@ -87,18 +89,42 @@ def _estilizar_cabecalho(ws, colunas: list, cor: str):
     ws.row_dimensions[1].height = 28
 
 
-def ja_existe_excel(numero_nf: str, caminho_planilha: str) -> bool:
-    """Verifica se a nota já foi registrada na planilha (fallback)."""
+def _so_digitos(valor) -> str:
+    return "".join(c for c in str(valor) if c.isdigit()) if valor is not None else ""
+
+
+def ja_existe_excel(numero_nf: str, caminho_planilha: str, cnpj_emitente: str = None) -> bool:
+    """Verifica se a nota já foi registrada na planilha (fallback).
+    A mesma nota = mesmo número E mesmo CNPJ do emitente (fornecedores
+    diferentes podem emitir notas com o mesmo número).
+    """
     if not os.path.exists(caminho_planilha):
         return False
     try:
         import pandas as pd
-        df = pd.read_excel(caminho_planilha, sheet_name="Resumo")
-        if "Número NF" in df.columns:
-            return str(numero_nf) in df["Número NF"].astype(str).values
+        df = pd.read_excel(caminho_planilha, sheet_name="Resumo", dtype=str)
+        if "Número NF" not in df.columns:
+            return False
+        mesmo_numero = df["Número NF"].str.removesuffix(".0") == str(numero_nf)
+        if cnpj_emitente is None or "CNPJ Emitente" not in df.columns:
+            return bool(mesmo_numero.any())
+        mesmo_cnpj = df["CNPJ Emitente"].map(_so_digitos) == _so_digitos(cnpj_emitente)
+        return bool((mesmo_numero & mesmo_cnpj).any())
     except Exception:
         pass
     return False
+
+
+def _remover_totais_antigos(ws):
+    """
+    Versões anteriores gravavam uma linha "TOTAL GERAL" (+ uma linha vazia) a cada nota,
+    no meio dos dados. Remove essas linhas para o SUM da coluna J não contar em dobro.
+    """
+    for linha in range(ws.max_row, 1, -1):
+        rotulo = ws.cell(linha, 5).value
+        vazia = all(ws.cell(linha, c).value is None for c in range(1, len(COLUNAS_RESUMO) + 1))
+        if rotulo == "TOTAL GERAL" or vazia:
+            ws.delete_rows(linha)
 
 
 def criar_planilha(caminho_planilha):
@@ -118,7 +144,8 @@ def gravar_nota_excel(nota, caminho_planilha=CAMINHO_PLANILHA_PADRAO) -> bool:
     """
     Fallback: grava na planilha Excel (código original mantido para compatibilidade).
     """
-    if nota.numero and ja_existe_excel(nota.numero, caminho_planilha):
+    # Verifica duplicata usando o caminho correto
+    if nota.numero and ja_existe_excel(nota.numero, caminho_planilha, nota.cnpj_emitente):
         print(f"  ⚠  NF {nota.numero} já registrada — ignorando.")
         return False
 
@@ -129,6 +156,7 @@ def gravar_nota_excel(nota, caminho_planilha=CAMINHO_PLANILHA_PADRAO) -> bool:
     wb = load_workbook(caminho_planilha)
     ws_resumo = wb["Resumo"]
     ws_itens  = wb["Itens"]
+    _remover_totais_antigos(ws_resumo)
 
     linha_resumo = [
         datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -158,9 +186,10 @@ def gravar_nota_excel(nota, caminho_planilha=CAMINHO_PLANILHA_PADRAO) -> bool:
             item.get("valor"),
         ])
 
-    total_row = ws_resumo.max_row + 2
-    ws_resumo.cell(total_row, 5, "TOTAL GERAL").font = Font(bold=True, name="Arial")
-    ws_resumo.cell(total_row, 6, f"=SUM(F2:F{ws_resumo.max_row - 1})").font = Font(bold=True, name="Arial")
+    # Total geral fora da área de dados (coluna J), para não se misturar com as notas
+    # nem ser somado de novo a cada gravação. SUM(F:F) ignora o cabeçalho (texto).
+    ws_resumo.cell(1, COLUNA_TOTAL, "TOTAL GERAL").font = Font(bold=True, name="Arial")
+    ws_resumo.cell(2, COLUNA_TOTAL, "=SUM(F:F)").font = Font(bold=True, name="Arial")
 
     wb.save(caminho_planilha)
     print(f"  [OK] NF {nota.numero or 'sem número'} gravada com sucesso (Excel).")

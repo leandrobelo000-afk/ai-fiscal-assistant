@@ -1,46 +1,111 @@
-# ==========================================
-# ETAPA 5: DASHBOARD E ANALYTICS
-# ==========================================
-# NOTE: This is a draft/incomplete module. The actual dashboard is implemented
-# inline in step4_interface/app.py (lines ~175-233). This file is kept for
-# future refactoring into a proper standalone component.
+﻿"""
+step5_dashboard/analytics.py
+----------------------------
+Cálculos financeiros do dashboard, separados da interface para poderem ser testados.
 
-import streamlit as st
-import os
-from config import settings
+Todas as funções recebem os DataFrames de database.carregar_notas() / carregar_itens().
+"""
+
+import pandas as pd
 
 
-def render_dashboard(caminho_planilha: str | None = None):
-    """Render the executive dashboard. Designed to be called from app.py."""
-    if caminho_planilha is None:
-        caminho_planilha = settings.CAMINHO_PLANILHA
+# ─────────────────────────────────────────────
+# Filtros
+# ─────────────────────────────────────────────
 
-    st.divider()
-    st.header("📊 Painel Executivo (Dashboard)")
+def filtrar(notas: pd.DataFrame, inicio=None, fim=None, fornecedores=None) -> pd.DataFrame:
+    """Filtra por período de emissão (inclusivo) e por lista de fornecedores."""
+    df = notas
+    if inicio is not None:
+        df = df[df["data_emissao"] >= pd.Timestamp(inicio)]
+    if fim is not None:
+        df = df[df["data_emissao"] <= pd.Timestamp(fim)]
+    if fornecedores:
+        df = df[df["nome_emitente"].isin(fornecedores)]
+    return df
 
-    if os.path.exists(caminho_planilha):
-        import pandas as pd
 
-        df = pd.read_excel(caminho_planilha, sheet_name="Resumo")
+# ─────────────────────────────────────────────
+# Indicadores
+# ─────────────────────────────────────────────
 
-        if not df.empty:
-            faturamento_total = df["Valor Total"].sum()
-            impostos_totais = df["Impostos"].sum()
-            total_notas = len(df)
-            ticket_medio = faturamento_total / total_notas
+def kpis(notas: pd.DataFrame) -> dict:
+    """Gasto total, nº de notas, ticket médio, impostos e carga tributária (%)."""
+    gasto = float(notas["valor_total"].fillna(0).sum())
+    impostos = float(notas["impostos"].fillna(0).sum())
+    qtd = int(len(notas))
+    return {
+        "gasto_total": gasto,
+        "qtd_notas": qtd,
+        "ticket_medio": gasto / qtd if qtd else 0.0,
+        "impostos": impostos,
+        "carga_tributaria": impostos / gasto * 100 if gasto else 0.0,
+    }
 
-            def formata_br(valor):
-                return f'R$ {valor:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
-            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+def gasto_mensal(notas: pd.DataFrame) -> pd.DataFrame:
+    """Uma linha por mês (inclusive meses sem notas), com gasto, impostos e nº de notas."""
+    df = notas.dropna(subset=["data_emissao"])
+    if df.empty:
+        return pd.DataFrame(columns=["mes", "gasto", "impostos", "qtd_notas"])
+    mensal = (
+        df.groupby(df["data_emissao"].dt.to_period("M"))
+        .agg(gasto=("valor_total", "sum"), impostos=("impostos", "sum"), qtd_notas=("id", "count"))
+    )
+    meses = pd.period_range(mensal.index.min(), mensal.index.max(), freq="M")
+    mensal = mensal.reindex(meses, fill_value=0)
+    mensal.index = mensal.index.to_timestamp()
+    return mensal.rename_axis("mes").reset_index()
 
-            with kpi1:
-                 st.metric(label="💰 Faturamento Total", value=formata_br(faturamento_total))
-            with kpi2:
-                st.metric(label="🏛️ Impostos Retidos", value=formata_br(impostos_totais))
-            with kpi3:
-                st.metric(label="🧾 Ticket Médio", value=formata_br(ticket_medio))
-            with kpi4:
-                st.metric(label="📊 Total de Notas", value=total_notas)
-    else:
-        st.warning("Nenhuma planilha encontrada para gerar o dashboard. Por favor, faça o upload de uma nota fiscal primeiro.")
+
+def variacao_ultimo_mes(mensal: pd.DataFrame) -> float | None:
+    """Variação % do gasto do último mês contra o anterior; None se não houver base."""
+    if len(mensal) < 2 or mensal["gasto"].iloc[-2] == 0:
+        return None
+    anterior, atual = mensal["gasto"].iloc[-2], mensal["gasto"].iloc[-1]
+    return (atual - anterior) / anterior * 100
+
+
+def gasto_por_fornecedor(notas: pd.DataFrame) -> pd.DataFrame:
+    """Gasto e nº de notas por fornecedor, do maior para o menor."""
+    return (
+        notas.groupby("nome_emitente", dropna=False)
+        .agg(gasto=("valor_total", "sum"), qtd_notas=("id", "count"))
+        .sort_values("gasto", ascending=False)
+        .reset_index()
+        .rename(columns={"nome_emitente": "fornecedor"})
+    )
+
+
+def curva_abc(notas: pd.DataFrame, limite_a: float = 80.0, limite_b: float = 95.0) -> pd.DataFrame:
+    """
+    Classifica fornecedores pela participação acumulada no gasto (Pareto):
+      A = até 80% do gasto, B = até 95%, C = o restante.
+    O fornecedor que cruza o limite fica na classe de cima.
+    """
+    df = gasto_por_fornecedor(notas)
+    total = df["gasto"].sum()
+    if df.empty or total == 0:
+        return df.assign(participacao=[], acumulado=[], classe=[])
+    df["participacao"] = df["gasto"] / total * 100
+    df["acumulado"] = df["participacao"].cumsum()
+    acumulado_anterior = df["acumulado"] - df["participacao"]
+    df["classe"] = "C"
+    df.loc[acumulado_anterior < limite_b, "classe"] = "B"
+    df.loc[acumulado_anterior < limite_a, "classe"] = "A"
+    return df
+
+
+def top_itens(itens: pd.DataFrame, n: int = 10) -> pd.DataFrame:
+    """Itens com maior gasto somado, agrupando descrições iguais (sem diferenciar maiúsculas)."""
+    if itens.empty:
+        return pd.DataFrame(columns=["item", "gasto", "ocorrencias"])
+    chave = itens["descricao"].fillna("(sem descrição)").str.strip().str.upper()
+    return (
+        itens.assign(item=chave)
+        .groupby("item")
+        .agg(gasto=("valor", "sum"), ocorrencias=("id", "count"))
+        .sort_values("gasto", ascending=False)
+        .head(n)
+        .reset_index()
+    )

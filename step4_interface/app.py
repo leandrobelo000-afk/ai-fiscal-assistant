@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import os
 import tempfile
 import json
@@ -22,6 +22,8 @@ from config import settings
 
 from step2_llm.processor import processar_nota_fiscal
 from step3_spreadsheet.writer import gravar_nota
+from step5_dashboard.database import salvar_nota
+from step5_dashboard import sheets_sync
 from step1_ocr.extractor import verificar_tesseract
 
 # Importa funções de leitura do banco SQLite
@@ -36,11 +38,17 @@ try:
 except ImportError:
     USAR_SQLITE = False
 
-verificar_tesseract()
+@st.cache_resource(show_spinner="Verificando o Tesseract...")
+def _tesseract_disponivel() -> bool:
+    # Uma vez por sessão do servidor: evita repetir a instalação (e o aviso do UAC) a cada clique
+    return verificar_tesseract()
 
 # 1. Configuração da Página
-st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
-
+# Quando roda dentro do app da Etapa 5, a configuração já foi feita lá
+try:
+    st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="wide")
+except st.errors.StreamlitAPIException:
+    pass
 
 # ==========================================
 # BARRA LATERAL (CONFIGURAÇÕES)
@@ -48,7 +56,7 @@ st.set_page_config(page_title="AI Fiscal Assistant", page_icon="🧾", layout="w
 with st.sidebar:
     st.header("⚙️ Configurações do Sistema")
     st.write("Escolha onde os dados serão salvos/lidos:")
-
+    
     # Busca bancos de dados existentes (.db) e planilhas (.xlsx)
     bancos_encontrados = glob.glob("**/*.db", recursive=True)
     planilhas_encontradas = glob.glob("**/*.xlsx", recursive=True)
@@ -78,6 +86,17 @@ with st.sidebar:
     if USAR_SQLITE and caminho_arquivo.endswith(".db"):
         init_db(caminho_arquivo)
 
+    # Status do Tesseract
+    if not _tesseract_disponivel():
+        st.warning(
+            "⚠️ Tesseract não está instalado, então o OCR de apoio fica desligado. "
+            "A leitura pelo modelo Vision continua funcionando. Para ativar, instale o "
+            "[Tesseract para Windows](https://github.com/UB-Mannheim/tesseract/wiki) "
+            "e reinicie o app."
+        )
+
+st.title("🧾 AI Fiscal Assistant - Central")
+st.write("Faça o upload, extraia os dados, salve na planilha e converse com a nota!")
 
 # ==========================================
 # ÁREA PRINCIPAL: COLUNAS
@@ -106,12 +125,21 @@ with col1:
                     # Salva os dados na memória da sessão para o Chat poder usar depois
                     st.session_state['nota_atual'] = nota_processada
 
-                    # PASSO C: Executar a Etapa 3 (Gravar no Banco)
-                    st.toast("Salvando no banco de dados...")
-
+                    # PASSO C: Gravar na base SQLite (fonte única, Etapa 5) e na planilha (Etapa 3)
+                    st.toast("Salvando na base de dados...")
+                    salvar_nota(nota_processada)
+                    st.toast("Salvando na planilha...")
                     gravar_nota(nota_processada, caminho_arquivo)
 
-                    st.success("✅ Nota processada e salva no banco com sucesso!")
+                    # PASSO D: Espelhar no Google Sheets, se configurado (Etapa 5.2)
+                    if sheets_sync.configurado():
+                        try:
+                            sheets_sync.sincronizar()
+                            st.toast("Google Sheets atualizado.")
+                        except Exception as e:
+                            st.warning(f"Nota salva, mas o Google Sheets não foi atualizado: {sheets_sync.mensagem_amigavel(e)}")
+                    
+                    st.success("✅ Nota processada e salva com sucesso!")
 
                     # Mostra os dados extraídos de forma bonita na tela
                     st.json(nota_processada.__dict__)
@@ -119,9 +147,10 @@ with col1:
                 except Exception as e:
                     st.error(f"Ocorreu um erro no processamento: {e}")
                 finally:
-                    # PASSO D: Limpeza - deleta o arquivo temporário
+                    # PASSO E: Limpeza - deleta o arquivo temporário para não lotar o PC
                     if 'caminho_temp' in locals() and os.path.exists(caminho_temp):
                         os.remove(caminho_temp)
+
 with col2:
     st.subheader("💬 2. Chat com a Nota Fiscal")
 

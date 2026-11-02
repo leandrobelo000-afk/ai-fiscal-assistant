@@ -1,4 +1,4 @@
-"""
+﻿"""
 step1_ocr/extractor.py
 ----------------------
 Extração de dados de notas fiscais a partir de PDF ou imagem.
@@ -36,72 +36,84 @@ from config import settings
 import subprocess
 import shutil
 
-def verificar_tesseract():
-    """
-    Verifica se Tesseract está instalado e configurado.
-    Suporta Windows, macOS e Linux.
-    Em Windows, baixa e instala automaticamente.
-    Em Mac/Linux, instrui o usuário a instalar via gerenciador de pacotes.
-    Prioridade: 1) TESSERACT_CMD do .env, 2) PATH, 3) Windows padrão, 4) Auto-install (Win) / Instruções (Mac/Linux)
-    """
+URL_INSTALADOR_TESSERACT = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
+
+
+def _caminhos_tesseract_windows() -> list:
+    pastas = [
+        os.environ.get("ProgramFiles", r"C:\Program Files"),
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs"),
+    ]
+    return [os.path.join(p, "Tesseract-OCR", "tesseract.exe") for p in pastas if p]
+
+
+def _localizar_tesseract():
     # 1. TESSERACT_CMD explícito no .env
     if settings.TESSERACT_CMD and os.path.isfile(settings.TESSERACT_CMD):
-        pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
-        print(f"[OK] Tesseract configurado via .env: {settings.TESSERACT_CMD}")
-        return
+        return settings.TESSERACT_CMD
 
     tesseract_no_path = shutil.which("tesseract")
-    sistema = platform.system().lower()
-
-    # 2. Verifica se existe no PATH e é executável
+    # Verifica se realmente existe no disco, não só no PATH
     if tesseract_no_path and os.path.isfile(tesseract_no_path):
-        pytesseract.pytesseract.tesseract_cmd = tesseract_no_path
-        print("[OK] Tesseract ja instalado e no PATH.")
-        return
+        return tesseract_no_path
+    if platform.system() == "Windows":
+        for caminho in _caminhos_tesseract_windows():
+            if os.path.isfile(caminho):
+                return caminho
+    return None
 
-    # 3. Windows: caminho padrão de instalação
-    if sistema == "windows":
-        caminho_padrao = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        if os.path.isfile(caminho_padrao):
-            pytesseract.pytesseract.tesseract_cmd = caminho_padrao
-            print("[OK] Tesseract encontrado no caminho padrao do Windows.")
-            return
 
-        print("[AVISO] Tesseract nao encontrado. Instalando automaticamente (Windows)...")
-        url = "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe"
-        instalador = os.path.join(os.environ.get("TEMP", "."), "tesseract_setup.exe")
-        try:
-            subprocess.run(["curl", "-L", url, "-o", instalador], check=True)
-            subprocess.run([instalador, "/S", "/Lang=eng"], check=True)
-            pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-            print("[OK] Tesseract instalado com sucesso.")
-        except subprocess.CalledProcessError as e:
-            print(f"[ERRO] Falha ao instalar Tesseract automaticamente: {e}")
-            print("   Instale manualmente: https://github.com/UB-Mannheim/tesseract/wiki")
-            sys.exit(1)
-        return
+def _instalar_tesseract_windows() -> bool:
+    """
+    Baixa e roda o instalador. O instalador exige administrador: sem elevação,
+    o Windows recusa (WinError 740) e então pedimos a elevação pelo UAC.
+    """
+    instalador = os.path.join(os.environ["TEMP"], "tesseract_setup.exe")
+    subprocess.run(["curl", "-L", URL_INSTALADOR_TESSERACT, "-o", instalador], check=True)
+    try:
+        subprocess.run([instalador, "/S", "/Lang=eng"], check=True)
+    except OSError as e:
+        if getattr(e, "winerror", None) != 740:
+            raise
+        print("  Permissão de administrador necessária. Confirme a janela do Windows (UAC)...")
+        subprocess.run([
+            "powershell", "-NoProfile", "-Command",
+            f"Start-Process -FilePath '{instalador}' -ArgumentList '/S' -Verb RunAs -Wait",
+        ], check=True)
+    return _localizar_tesseract() is not None
 
-    # 4. macOS: Homebrew
-    if sistema == "darwin":
-        print("[AVISO] Tesseract nao encontrado no macOS.")
-        print("   Instale com: brew install tesseract tesseract-lang")
-        print("   Depois reinicie o terminal/IDE.")
-        sys.exit(1)
 
-    # 5. Linux: apt (Debian/Ubuntu), dnf (Fedora), pacman (Arch), etc.
-    if sistema == "linux":
-        print("[AVISO] Tesseract nao encontrado no Linux.")
-        print("   Instale com o gerenciador de pacotes da sua distro:")
-        print("   - Ubuntu/Debian: sudo apt-get install tesseract-ocr tesseract-ocr-por")
-        print("   - Fedora:      sudo dnf install tesseract tesseract-langpack-por")
-        print("   - Arch:        sudo pacman -S tesseract tesseract-data-por")
-        print("   Depois reinicie o terminal/IDE.")
-        sys.exit(1)
+def verificar_tesseract() -> bool:
+    """
+    Garante que o Tesseract (usado como fallback de OCR) está disponível.
+    Retorna False, sem interromper o programa, se não for possível instalá-lo:
+    a leitura principal pelo modelo Vision continua funcionando sem ele.
+    """
+    caminho = _localizar_tesseract()
+    if caminho:
+        pytesseract.pytesseract.tesseract_cmd = caminho
+        print("✔ Tesseract já instalado.")
+        return True
 
-    # Fallback genérico
-    print(f"[AVISO] Sistema operacional nao suportado para instalacao automatica: {sistema}")
-    print("   Instale o Tesseract manualmente e garanta que esteja no PATH.")
-    sys.exit(1)
+    if platform.system() != "Windows":
+        print("⚠ Tesseract não encontrado. Instale pelo gerenciador de pacotes (ex.: sudo apt install tesseract-ocr).")
+        return False
+
+    print("⚠ Tesseract não encontrado. Instalando...")
+    try:
+        instalado = _instalar_tesseract_windows()
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"⚠ Não foi possível instalar o Tesseract automaticamente: {e}")
+        instalado = False
+
+    if not instalado:
+        print("  Instale manualmente: " + URL_INSTALADOR_TESSERACT)
+        return False
+
+    pytesseract.pytesseract.tesseract_cmd = _localizar_tesseract()
+    print("✔ Tesseract instalado com sucesso.")
+    return True
 
 # ─────────────────────────────────────────────
 # Modelo de dados
@@ -197,7 +209,7 @@ def parsear_nota(texto: str) -> NotaFiscal:
     else:
         nf.confidence_score['data_emissao'] = 0.0
 
-# Valor total — tenta múltiplos padrões pois o OCR distorce bastante
+    # Valor total — tenta múltiplos padrões pois o OCR distorce bastante
     for padrao in [
         r'Valor\s+Total\s+R[S$][\s\n]+([\d]+[,\.]\d{2})',   # linha separada
         r'Valor\s+Total\s+R[S$]\s*([\d]+[,\.]\d{2})',        # mesma linha
@@ -212,7 +224,7 @@ def parsear_nota(texto: str) -> NotaFiscal:
     else:
         nf.confidence_score['valor_total'] = 0.0
 
-    # Impostos — "RS0,00" ou "R$0,00" colado na linha de tributos
+    # Impostos — "RS0,00" ou "R,00" colado na linha de tributos
     match = re.search(
         r'Tributos\s+Totais[^\n]*\n\s*R[S$]?\s*([\d]+[,\.]\d{2})',
         texto, re.IGNORECASE
