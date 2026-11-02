@@ -20,11 +20,19 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # ─────────────────────────────────────────────
-# Configuração
+# Configuração (via .env)
 # ─────────────────────────────────────────────
 
-LM_STUDIO_URL    = "http://localhost:1234/v1/chat/completions"
-MODELO           = "qwen2.5-vl-3b-instruct"
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import settings
+
+LM_STUDIO_URL    = settings.LM_STUDIO_URL
+LM_STUDIO_MODELS_URL = settings.LM_STUDIO_MODELS_URL
+MODELO_VISAO     = settings.MODELO_VISAO
+MODELO_CHAT      = settings.MODELO_CHAT
+TEMPERATURA      = settings.TEMPERATURA
+MAX_TOKENS_VISAO = settings.MAX_TOKENS_VISAO
+MAX_TOKENS_CHAT  = settings.MAX_TOKENS_CHAT
 
 
 # ─────────────────────────────────────────────
@@ -279,9 +287,9 @@ def chamar_llm_texto(texto_ocr: str) -> dict:
         "max_tokens": 1024,
     }
 
-    resposta = requests.post(LM_STUDIO_URL, on=payload, timeout=60)
+    resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=60)
     resposta.raise_for_status()
-    conteudo = resposta.json()["choices"]["0 message"]["content"].strip()
+    conteudo = resposta.json()["choices"][0]["message"]["content"].strip()
     return parse_json(conteudo)
 
 
