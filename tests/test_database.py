@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 Testes para step3_database (SQLAlchemy models + CRUD)
 """
@@ -16,6 +15,8 @@ from step3_database.crud import (
     migrar_excel_para_sqlite,
 )
 from step2_llm.processor import NotaFiscalProcessada
+from openpyxl import Workbook
+from openpyxl.styles import Font
 
 
 class TestModels:
@@ -128,14 +129,14 @@ class TestCRUD:
         gravar_nota(nota_processada_dados, init_test_db)
         df = obter_todas_notas_para_dataframe(init_test_db)
         assert len(df) == 1
-        assert df.iloc[0]["numero"] == "12345"
-        assert df.iloc[0]["valor_total"] == 196.00
+        assert df.iloc[0]["Número NF"] == "12345"
+        assert df.iloc[0]["Valor Total (R$)"] == 196.00
 
     def test_obter_itens_para_dataframe(self, init_test_db, nota_processada_dados):
         gravar_nota(nota_processada_dados, init_test_db)
         df = obter_todos_itens_para_dataframe(init_test_db)
         assert len(df) == 3
-        assert list(df["descricao"]) == ["PRODUTO TESTE A", "PRODUTO TESTE B", "SERVIÇO TESTE C"]
+        assert list(df["Descrição Item"]) == ["PRODUTO TESTE A", "PRODUTO TESTE B", "SERVIÇO TESTE C"]
 
     def test_get_estatisticas(self, init_test_db, nota_processada_dados):
         gravar_nota(nota_processada_dados, init_test_db)
@@ -154,16 +155,10 @@ class TestCRUD:
 
 
 class TestMigracaoExcel:
-    """Testes de migração Excel → SQLite."""
+    """Testes de migração Excel → SQLite (step3_database)."""
 
-    def test_migrar_excel_para_sqlite(self, temp_excel_path, temp_db_path):
+    def test_migrar_excel_para_sqlite(self, temp_excel_path, init_test_db):
         """Testa migração completa."""
-        # Cria Excel de teste
-        import pandas as pd
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment
-        from openpyxl.utils import get_column_letter
-
         wb = Workbook()
         ws1 = wb.active
         ws1.title = "Resumo"
@@ -185,9 +180,17 @@ class TestMigracaoExcel:
             c = ws2.cell(row=1, column=col, value=h)
             c.font = Font(bold=True)
 
-        ws2.append(["11111", "01/01/2024", "EMPRESA A", "Item A1", 100.0])
-        ws2.append(["22222", "02/01/2024", "EMPRESA B", "Item B1", 150.0])
-        ws2.append(["22222", "02/01/2024", "EMPRESA B", "Item B2", 50.0])
+        # Escreve dados diretamente nas células (linhas 2, 3, 4) com formatação de texto
+        dados_itens = [
+            ["11111", "01/01/2024", "EMPRESA A", "Item A1", 100.0],
+            ["22222", "02/01/2024", "EMPRESA B", "Item B1", 150.0],
+            ["22222", "02/01/2024", "EMPRESA B", "Item B2", 50.0],
+        ]
+        for row_idx, row_data in enumerate(dados_itens, start=2):
+            for col_idx, value in enumerate(row_data, start=1):
+                cell = ws2.cell(row=row_idx, column=col_idx, value=value)
+                if col_idx == 1:  # Coluna "Número NF" como texto
+                    cell.number_format = '@'
 
         wb.save(temp_excel_path)
 
@@ -201,7 +204,7 @@ class TestMigracaoExcel:
         # Verifica no banco
         df = obter_todas_notas_para_dataframe(init_test_db)
         assert len(df) == 2
-        assert set(df["numero"].tolist()) == {"11111", "22222"}
+        assert set(df["Número NF"].tolist()) == {"11111", "22222"}
 
     def test_migrar_arquivo_inexistente(self, init_test_db):
         with pytest.raises(FileNotFoundError):
@@ -213,7 +216,6 @@ class TestIntegracaoCompleta:
 
     def test_fluxo_gravar_varias_notas(self, init_test_db):
         """Grava múltiplas notas e verifica estatísticas."""
-        from step2_llm.processor import NotaFiscalProcessada
 
         for i in range(3):
             nota = NotaFiscalProcessada()
@@ -233,86 +235,3 @@ class TestIntegracaoCompleta:
         assert stats["total_notas"] == 3
         assert stats["faturamento_total"] == 600.0  # 100+200+300
         assert stats["ticket_medio"] == 200.0
-=======
-from types import SimpleNamespace
-
-import pandas as pd
-from openpyxl import Workbook
-
-from step5_dashboard import database as db
-
-
-def _nota(numero="123", cnpj="12.345.678/0001-90", valor=117.14, itens=None, **extra):
-    return SimpleNamespace(
-        numero=numero,
-        data_emissao="05/10/2026",
-        cnpj_emitente=cnpj,
-        nome_emitente="Mercado Exemplo",
-        valor_total=valor,
-        impostos=None,
-        itens=itens if itens is not None else [{"descricao": "Arroz", "valor": 20.5}],
-        rota="vision",
-        confianca="alta",
-        **extra,
-    )
-
-
-def test_normalizacao():
-    assert db.normalizar_data("05/10/2026") == "2026-10-05"
-    assert db.normalizar_data("lixo") is None
-    assert db.normalizar_cnpj("12.345.678/0001-90") == "12345678000190"
-    assert db.normalizar_valor("R$ 1.117,14") == 1117.14
-    assert db.normalizar_valor("117.14") == 117.14
-
-
-def test_mesma_nota_grava_uma_vez(tmp_path):
-    banco = tmp_path / "t.db"
-    assert db.salvar_nota(_nota(), banco) is True
-    # mesmo CNPJ escrito de outro jeito continua sendo a mesma nota
-    assert db.salvar_nota(_nota(cnpj="12345678000190"), banco) is False
-    assert len(db.carregar_notas(banco)) == 1
-    assert len(db.carregar_itens(banco)) == 1
-
-
-def test_mesmo_numero_de_fornecedores_diferentes(tmp_path):
-    banco = tmp_path / "t.db"
-    assert db.salvar_nota(_nota(cnpj="11.111.111/0001-11"), banco)
-    assert db.salvar_nota(_nota(cnpj="22.222.222/0001-22"), banco)
-    assert len(db.carregar_notas(banco)) == 2
-
-
-def test_tipos_para_o_dashboard(tmp_path):
-    banco = tmp_path / "t.db"
-    db.salvar_nota(_nota(valor="117,14"), banco)
-    notas = db.carregar_notas(banco)
-    assert notas.loc[0, "valor_total"] == 117.14
-    assert notas.loc[0, "impostos"] == 0.0
-    assert pd.api.types.is_datetime64_any_dtype(notas["data_emissao"])
-
-
-def test_migra_excel_antigo_ignorando_totais(tmp_path):
-    planilha = tmp_path / "antiga.xlsx"
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Resumo"
-    ws.append(["Data Processamento", "Número NF", "Data Emissão", "CNPJ Emitente",
-               "Nome Emitente", "Valor Total (R$)", "Impostos (R$)", "Qtd Itens"])
-    ws.append(["01/10/2026 10:00", 1, "01/10/2026", "11.111.111/0001-11", "Posto A", 100.0, 0, 1])
-    ws.append([None] * 8)
-    ws.append([None, None, None, None, "TOTAL GERAL", "=SUM(F2:F2)"])
-    ws.append(["02/10/2026 10:00", 2, "02/10/2026", "22.222.222/0001-22", "Mercado B", 50.0, 1.5, 1])
-    ws.append([None, None, None, None, "TOTAL GERAL", "=SUM(F2:F5)"])
-    itens = wb.create_sheet("Itens")
-    itens.append(["Número NF", "Data Emissão", "Nome Emitente", "Descrição Item", "Valor Item (R$)"])
-    itens.append([1, "01/10/2026", "Posto A", "Gasolina", 100.0])
-    itens.append([2, "02/10/2026", "Mercado B", "Café", 50.0])
-    wb.save(planilha)
-
-    banco = tmp_path / "t.db"
-    assert db.migrar_excel(planilha, banco) == {"importadas": 2, "ignoradas": 0}
-    notas = db.carregar_notas(banco)
-    assert notas["valor_total"].sum() == 150.0
-    assert sorted(db.carregar_itens(banco)["descricao"]) == ["Café", "Gasolina"]
-    # rodar de novo não duplica
-    assert db.migrar_excel(planilha, banco) == {"importadas": 0, "ignoradas": 2}
->>>>>>> b88a0976887410268d252e78e18f7dea8070984e

@@ -47,6 +47,7 @@ pip install -r requirements.txt > nul
 echo.
 echo [*] Tudo pronto! Abrindo a interface do sistema...
 echo ===================================================
-streamlit run step5_dashboard/app.py
+start "" "http://localhost:8501"
+streamlit run step5_dashboard/app.py --server.headless=false
 
 pause

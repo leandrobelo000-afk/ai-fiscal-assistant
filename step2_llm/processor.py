@@ -192,27 +192,36 @@ def parse_json(conteudo: str) -> dict:
     except Exception:
         # Último recurso — retorna o que conseguiu extrair via regex
         print("  ⚠ JSON corrompido — extraindo campos manualmente...")
+        # Regex que aceita chave com ou sem aspas: "numero" ou numero
+        def extrair(campo, padrao_valor=r'"([^"]+)"'):
+            padrao = rf'"?{campo}"?\s*:\s*{padrao_valor}'
+            m = re.search(padrao, conteudo)
+            return m.group(1) if m else None
+
         return {
-            "numero":        re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "data_emissao":  re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "cnpj_emitente": re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "nome_emitente": re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "valor_total":   limpar_valor_monetario(re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo) else None,
-            "impostos":      limpar_valor_monetario(re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo) else None,
+            "numero":        extrair("numero"),
+            "data_emissao":  extrair("data_emissao"),
+            "cnpj_emitente": extrair("cnpj_emitente"),
+            "nome_emitente": extrair("nome_emitente"),
+            "valor_total":   limpar_valor_monetario(extrair("valor_total", r'([\d.,]+)')) if extrair("valor_total", r'([\d.,]+)') else None,
+            "impostos":      limpar_valor_monetario(extrair("impostos", r'([\d.,]+)')) if extrair("impostos", r'([\d.,]+)') else None,
             "itens":         [],
             "confianca":     "media",
         }
 
 
 def montar_nota(dados: dict, rota: str) -> NotaFiscalProcessada:
+    # Valor padrão 0.0 para monetários; fallback verifica None ou 0.0 para impostos
+    valor_total = dados.get("valor_total")
+    impostos = dados.get("impostos")
+
     return NotaFiscalProcessada(
         numero        = dados.get("numero"),
         data_emissao  = dados.get("data_emissao"),
         cnpj_emitente = dados.get("cnpj_emitente"),
         nome_emitente = dados.get("nome_emitente"),
-        # O ESCUDO ENTRA AQUI 👇
-        valor_total   = limpar_valor_monetario(dados.get("valor_total")),
-        impostos      = limpar_valor_monetario(dados.get("impostos")),
+        valor_total   = limpar_valor_monetario(valor_total) if valor_total is not None else 0.0,
+        impostos      = limpar_valor_monetario(impostos) if impostos is not None else 0.0,
         itens         = dados.get("itens", []),
         confianca     = dados.get("confianca", "media"),
         rota          = rota,
@@ -228,7 +237,7 @@ def chamar_llm_vision(caminho_imagem: str) -> dict:
     b64, media_type = imagem_para_base64(caminho_imagem)
 
     payload = {
-        "model": MODELO,
+        "model": MODELO_VISAO,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": [
@@ -237,24 +246,14 @@ def chamar_llm_vision(caminho_imagem: str) -> dict:
                 {"type": "text", "text": PROMPT_VISION}
             ]}
         ],
-        "temperature": 0.1,
-        "max_tokens": 2048,
+        "temperature": TEMPERATURA,
+        "max_tokens": MAX_TOKENS_VISAO,
     }
 
     resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=600)
     resposta.raise_for_status()
     conteudo = resposta.json()["choices"][0]["message"]["content"].strip()
-    print("  ⚠ JSON corrompido — extraindo campos manualmente...")
-    return {
-            "numero":        re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"numero"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "data_emissao":  re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"data_emissao"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "cnpj_emitente": re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"cnpj_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "nome_emitente": re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo) and re.search(r'"nome_emitente"\s*:\s*"([^"]+)"', conteudo).group(1),
-            "valor_total":   limpar_valor_monetario(re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"valor_total"\s*:\s*([\d.,]+)', conteudo) else None,
-            "impostos":      limpar_valor_monetario(re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo).group(1)) if re.search(r'"impostos"\s*:\s*([\d.,]+)', conteudo) else None,
-            "itens":         [],
-            "confianca":     "media",
-        }
+    return parse_json(conteudo)
 
 
 # ─────────────────────────────────────────────
@@ -278,13 +277,13 @@ def extrair_com_tesseract(caminho: str) -> str:
 def chamar_llm_texto(texto_ocr: str) -> dict:
     """Envia texto extraído pelo Tesseract ao modelo."""
     payload = {
-        "model": MODELO,
+        "model": MODELO_CHAT,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user",   "content": PROMPT_TEXTO(texto_ocr)}
         ],
-        "temperature": 0.1,
-        "max_tokens": 1024,
+        "temperature": TEMPERATURA,
+        "max_tokens": MAX_TOKENS_CHAT,
     }
 
     resposta = requests.post(LM_STUDIO_URL, json=payload, timeout=60)
@@ -315,11 +314,12 @@ def processar_nota_fiscal(caminho: str) -> NotaFiscalProcessada:
     nota  = montar_nota(dados, rota="vision")
 
     # Complementa com Tesseract apenas os campos ausentes
+    # Para impostos, considera None ou 0.0 como "ausente" (padrão quando não encontrado)
     campos_ausentes = [
         k for k, v in {
             "numero": nota.numero,
             "impostos": nota.impostos,
-        }.items() if v is None
+        }.items() if v is None or (k == "impostos" and v == 0.0)
     ]
 
     if campos_ausentes:
@@ -338,7 +338,17 @@ def processar_nota_fiscal(caminho: str) -> NotaFiscalProcessada:
                 print(f"  ✔ Número encontrado pelo Tesseract: {nota.numero}")
 
         if "impostos" in campos_ausentes:
-            match = re.search(r'Tributos\s+Totais[^\n]*\n\s*R[S$]?\s*([\d]+[,\.]\d{2})', texto_ocr, re.IGNORECASE)
+            # Regex mais flexível para capturar tributos no OCR
+            match = re.search(
+                r'Tributos\s+Totais\s+R?\$?\s*([\d]+[,\.]\d{2})',
+                texto_ocr, re.IGNORECASE
+            )
+            if not match:
+                # Tenta padrão alternativo: "Tributos" seguido de valor
+                match = re.search(
+                    r'Tributos[^\d]*([\d]+[,\.]\d{2})',
+                    texto_ocr, re.IGNORECASE
+                )
             if match:
                 nota.impostos = limpar_valor_monetario(match.group(1))
                 print(f"  ✔ Impostos encontrados pelo Tesseract: {nota.impostos}")

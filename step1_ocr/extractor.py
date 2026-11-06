@@ -193,8 +193,9 @@ def parsear_nota(texto: str) -> NotaFiscal:
     else:
         nf.confidence_score['cnpj'] = 0.0
 
-    # Número da NF — "NFC-e no 37072" mas OCR pode ler "KFC-e" ou "NFC"
-    match = re.search(r'[NKM]FC-e\s+n[oº°0]\s*(\d+)', texto, re.IGNORECASE)
+    # Número da NF — "NFC-e no 37072" mas OCR pode ler "KFC-e", "NKC-e", "MFC-e", etc.
+    # Padrão: 2-4 letras maiúsculas seguidas de -e (ou FC-e), depois "no" ou "nº"
+    match = re.search(r'[A-Z]{2,4}[-\s]?e\s+n[oº°0]\s*(\d+)', texto, re.IGNORECASE)
     if match:
         nf.numero = match.group(1)
         nf.confidence_score['numero'] = 1.0
@@ -224,9 +225,9 @@ def parsear_nota(texto: str) -> NotaFiscal:
     else:
         nf.confidence_score['valor_total'] = 0.0
 
-    # Impostos — "RS0,00" ou "R,00" colado na linha de tributos
+    # Impostos — "Tributos Totais R$ 19,60" (mesma linha) ou com quebra de linha
     match = re.search(
-        r'Tributos\s+Totais[^\n]*\n\s*R[S$]?\s*([\d]+[,\.]\d{2})',
+        r'Tributos\s+Totais[^\d]*([\d]+[,\.]\d{2})',
         texto, re.IGNORECASE
     )
     if match:

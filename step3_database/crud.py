@@ -100,13 +100,13 @@ def gravar_nota(nota, db_path: str = None) -> bool:
 
     Mantém a mesma assinatura e comportamento do writer.py original.
     """
+    # Inicializa o banco se não existir (deve vir antes de ja_existe)
+    init_db(db_path)
+
     # Verifica duplicata
     if nota.numero and ja_existe(nota.numero, db_path):
         print(f"  [AVISO] NF {nota.numero} já registrada — ignorando.")
         return False
-
-    # Inicializa o banco se não existir
-    init_db(db_path)
 
     with get_session(db_path) as session:
         try:
@@ -306,7 +306,8 @@ def migrar_excel_para_sqlite(excel_path: str, db_path: str = None) -> dict:
                     session.flush()
 
                     # Adiciona os itens desta nota
-                    itens_nota = df_itens[df_itens["Número NF"] == numero_nf] if not df_itens.empty else pd.DataFrame()
+                    # Converte para string para comparar corretamente (pandas pode ler como int/float)
+                    itens_nota = df_itens[df_itens["Número NF"].astype(str) == numero_nf] if not df_itens.empty else pd.DataFrame()
                     for _, item_row in itens_nota.iterrows():
                         novo_item = Item(
                             nota_id=nova_nota.id,

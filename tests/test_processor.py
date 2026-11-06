@@ -258,7 +258,7 @@ class TestNotaFiscalProcessadaDataclass:
         assert nota.confianca == "alta"
         assert nota.itens == []
 
-    def test_criacao_com_dados(self, nota_processada_dados):
+    def test_criacao_com_dados(self, nota_processada_dados, assert_nota_processada_valida):
         assert_nota_processada_valida(nota_processada_dados)
         assert nota_processada_dados.numero == "12345"
         assert len(nota_processada_dados.itens) == 3

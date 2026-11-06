@@ -137,7 +137,7 @@ class TestNotaFiscalDataclass:
         assert nf.numero is None
         assert nf.confidence_score == {}
 
-    def test_criacao_com_dados(self, nota_fiscal_dados):
+    def test_criacao_com_dados(self, nota_fiscal_dados, assert_nf_campos_obrigatorios):
         assert_nf_campos_obrigatorios(nota_fiscal_dados)
         assert nota_fiscal_dados.fonte == "ocr"
         assert len(nota_fiscal_dados.confidence_score) == 5

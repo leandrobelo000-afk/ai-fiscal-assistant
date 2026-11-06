@@ -220,12 +220,27 @@ def assert_nf_campos_obrigatorios(nf):
     assert isinstance(nf.valor_total, float), "Valor total deve ser float"
 
 
-def assert_nota_processada_valida(nota):
-    """Verifica se NotaFiscalProcessada é válida."""
-    assert nota.numero is not None
-    assert nota.data_emissao is not None
-    assert nota.cnpj_emitente is not None
-    assert nota.valor_total is not None
-    assert isinstance(nota.valor_total, float)
-    assert nota.rota in ("vision", "vision+tesseract")
-    assert nota.confianca in ("alta", "media", "baixa")
+@pytest.fixture
+def assert_nota_processada_valida():
+    """Fixture que retorna função de validação para NotaFiscalProcessada."""
+    def _validar(nota):
+        assert nota.numero is not None
+        assert nota.data_emissao is not None
+        assert nota.cnpj_emitente is not None
+        assert nota.valor_total is not None
+        assert isinstance(nota.valor_total, float)
+        assert nota.rota in ("vision", "vision+tesseract")
+        assert nota.confianca in ("alta", "media", "baixa")
+    return _validar
+
+
+@pytest.fixture
+def assert_nf_campos_obrigatorios():
+    """Fixture que retorna função de validação para NotaFiscal (step1_ocr)."""
+    def _validar(nf):
+        assert nf.numero is not None, "Número da NF não deve ser None"
+        assert nf.data_emissao is not None, "Data emissão não deve ser None"
+        assert nf.cnpj_emitente is not None, "CNPJ não deve ser None"
+        assert nf.valor_total is not None, "Valor total não deve ser None"
+        assert isinstance(nf.valor_total, float), "Valor total deve ser float"
+    return _validar
