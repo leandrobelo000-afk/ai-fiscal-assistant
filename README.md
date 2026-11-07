@@ -10,16 +10,16 @@ O projeto é desenvolvido em etapas progressivas, cada uma construindo sobre a a
 |---|---|:---:|---|
 | 1 | `step1_ocr/` | ✅ Concluída | Extração de dados via OCR (PyTesseract + OpenCV) |
 | 2 | `step2_llm/` | ✅ Concluída | Processamento Vision com LLM local (Qwen2.5-VL) |
-| 3 | `step3_spreadsheet/` | ✅ Concluída | Gravação acumulativa e inteligente em planilha Excel |
+| 3 | `step3_spreadsheet/` / `step3_database/` | ✅ Concluída | Gravação em Excel + Fundação SQLite (fonte única dos dados) |
 | 4 | `step4_interface/` | ✅ Concluída | Interface visual interativa de upload, visualização e chat |
-| 5 | `step5_dashboard/` | 🚧 Em andamento | Dashboard financeiro, analytics e integração com Google Sheets |
+| 5 | `step5_dashboard/` | ✅ Concluída | Dashboard financeiro, analytics, Google Sheets + Looker Studio, testes |
 
 
 ---
 
 ## 🏗️ Arquitetura Atual (Pipeline de Processamento)
 
-O sistema opera como um pipeline completo de ETL (Extract, Transform, Load), agora orquestrado por uma interface visual centralizada.
+O sistema opera como um pipeline completo de ETL (Extract, Transform, Load), com armazenamento centralizado em SQLite, dashboard interativo e sincronização opcional com Google Sheets/Looker Studio.
 
 ```mermaid
 flowchart TD
@@ -30,8 +30,13 @@ flowchart TD
     E -- Texto Bruto --> F(🤖 LLM Estrutura os Dados)
     C -- Não --> D
     F --> D[JSON Estruturado]
-    D --> G[📊 Pandas + openpyxl<br/>Gravação no Excel]
-    G --> UI_View[Interface Streamlit<br/>Visualizador de Planilha]
+    D --> G[(🗄️ SQLite\nFonte Única dos Dados)]
+    G --> H[📊 Pandas + openpyxl<br/>Gravação no Excel]
+    G --> I[📈 Dashboard Streamlit + Plotly\nKPIs, Curva ABC, Itens, Filtros]
+    G --> J[☁️ Google Sheets Sync\nAba Notas / Itens / Resumo Mensal]
+    J --> K[📊 Looker Studio\nPainel Publicável]
+    H --> UI_View[Interface Streamlit<br/>Visualizador de Planilha]
+    I --> UI_View
 ```
 
 ## 🛠️ Stack Tecnológico
@@ -41,7 +46,11 @@ flowchart TD
 | **Interface & UI** | `streamlit` |
 | **OCR (Fallback)** | `pdfplumber`, `pytesseract`, `opencv-python` |
 | **Vision + LLM** | Qwen2.5-VL-3B-Instruct (via LM Studio local) |
+| **Banco de Dados** | `sqlalchemy`, `sqlite3` |
+| **Analytics & Dashboard** | `pandas`, `plotly` |
+| **Google Sheets / Looker Studio** | `gspread` |
 | **Manipulação de Dados** | `pandas`, `openpyxl` |
+| **Testes** | `pytest`, `pytest-cov`, `pytest-mock` |
 | **Linguagem** | Python 3.10+ |
 
 ---
@@ -73,7 +82,7 @@ cd ai-fiscal-assistant
 python -m venv .venv
 
 # Windows:
-.venv\Scriptsctivate
+.venv\Scripts\activate
 # Mac/Linux:
 source .venv/bin/activate
 ```
@@ -99,6 +108,20 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 O `iniciar.bat` já faz isso sozinho.
+
+### 🧪 Executando os Testes
+```bash
+# Todos os testes
+pytest
+
+# Com cobertura
+pytest --cov=step1_ocr --cov=step2_llm --cov=step3_database --cov=step3_spreadsheet --cov=step5_dashboard
+
+# Testes específicos
+pytest tests/test_database.py -v
+pytest tests/test_analytics.py -v
+pytest tests/test_sheets_sync.py -v
+```
 
 ---
 

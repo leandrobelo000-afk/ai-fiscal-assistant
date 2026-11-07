@@ -105,11 +105,32 @@ def _texto(valor) -> str | None:
 # ─────────────────────────────────────────────
 
 def conectar(caminho_banco: str = CAMINHO_BANCO) -> sqlite3.Connection:
-    """Abre o banco e cria as tabelas na primeira execução."""
+    """Abre o banco, cria as tabelas na primeira execução e migra colunas faltantes."""
     conexao = sqlite3.connect(caminho_banco)
     conexao.execute("PRAGMA foreign_keys = ON")
     conexao.executescript(SCHEMA)
+    _migrar_colunas_faltantes(conexao)
     return conexao
+
+
+def _migrar_colunas_faltantes(conexao: sqlite3.Connection) -> None:
+    """Adiciona colunas faltantes na tabela 'notas' para compatibilidade com bancos antigos."""
+    cursor = conexao.execute("PRAGMA table_info(notas)")
+    colunas_existentes = [row[1] for row in cursor.fetchall()]
+
+    colunas_necessarias = {
+        'rota': 'TEXT',
+        'confianca': 'TEXT',
+    }
+
+    for coluna, tipo in colunas_necessarias.items():
+        if coluna not in colunas_existentes:
+            try:
+                conexao.execute(f'ALTER TABLE notas ADD COLUMN {coluna} {tipo}')
+                conexao.commit()
+                print(f"  [MIGRATION] Coluna '{coluna}' adicionada à tabela 'notas'")
+            except Exception as e:
+                print(f"  [AVISO] Não foi possível adicionar coluna '{coluna}': {e}")
 
 
 @contextmanager

@@ -9,6 +9,7 @@ Mantém a mesma API do writer.py original:
 
 import os
 import sys
+import sqlite3
 from datetime import datetime
 from typing import Optional, List
 from contextlib import contextmanager
@@ -31,8 +32,8 @@ def get_engine(db_path: str = None):
 
     # Garante que o caminho é absoluto se for relativo
     if not os.path.isabs(db_path):
-        # Resolve relativo ao diretório do projeto
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        # Resolve relativo ao diretório do projeto (dois níveis acima: step3_database -> ai-fiscal-assistant)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         db_path = os.path.join(project_root, db_path)
 
     # Cria o diretório se não existir
@@ -53,10 +54,52 @@ def get_engine(db_path: str = None):
 def init_db(db_path: str = None) -> None:
     """
     Inicializa o banco de dados criando as tabelas se não existirem.
+    Também adiciona colunas faltantes em tabelas existentes (migração leve).
     """
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)
+
+    # Migração leve: adiciona colunas que podem faltar em bancos antigos
+    _migrar_colunas_faltantes(db_path)
+
     print(f"  [INFO] Banco de dados inicializado em: {db_path or CAMINHO_BANCO_PADRAO}")
+
+
+def _migrar_colunas_faltantes(db_path: str = None) -> None:
+    """
+    Adiciona colunas faltantes na tabela 'notas' para compatibilidade
+    com bancos criados antes da adição dos campos 'rota' e 'confianca'.
+    Usa conexão direta sqlite3 para evitar problemas com connection pool do SQLAlchemy.
+    """
+    if db_path is None:
+        db_path = CAMINHO_BANCO_PADRAO
+
+    # Resolve caminho absoluto igual ao get_engine
+    if not os.path.isabs(db_path):
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_path = os.path.join(project_root, db_path)
+
+    colunas_necessarias = {
+        'rota': 'TEXT',
+        'confianca': 'TEXT',
+    }
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("PRAGMA table_info(notas)")
+        colunas_existentes = [row[1] for row in cursor.fetchall()]
+
+        for coluna, tipo in colunas_necessarias.items():
+            if coluna not in colunas_existentes:
+                try:
+                    conn.execute(f'ALTER TABLE notas ADD COLUMN {coluna} {tipo}')
+                    conn.commit()
+                    print(f"  [MIGRATION] Coluna '{coluna}' adicionada à tabela 'notas'")
+                except Exception as e:
+                    print(f"  [AVISO] Não foi possível adicionar coluna '{coluna}': {e}")
+        conn.close()
+    except Exception as e:
+        print(f"  [AVISO] Erro na migração de colunas: {e}")
 
 
 @contextmanager
